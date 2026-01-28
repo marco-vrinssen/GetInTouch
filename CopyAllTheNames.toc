@@ -1,8 +1,7 @@
 ## Interface: 110200
 ## Title: Copy All The Names
-## Notes: Copy player names from context menus and scoreboard
+## Notes: Copy player names from context menus and PvP scoreboard
 ## Author: MIYANKO
 ## Version: 1.0.0
 
-ContextMenu.lua
-Scoreboard.lua
+CopyAllTheNames.lua
