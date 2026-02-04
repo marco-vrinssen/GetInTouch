@@ -1,0 +1,7 @@
+package-as: CopyAllTheNames
+
+enable-nolib-creation: no
+
+ignore:
+  - README.md
+  - .gitignore
