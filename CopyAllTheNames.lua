@@ -1,189 +1,267 @@
-local finderTags = {MENU_LFG_FRAME_SEARCH_ENTRY = true, MENU_LFG_FRAME_MEMBER_APPLY = true}
-local playerTypes = {PLAYER=true, PARTY=true, RAID_PLAYER=true, FRIEND=true, FRIEND_OFFLINE=true, FRIEND_ONLINE=true, BN_FRIEND=true, SELF=true, OTHER_PLAYER=true, ENEMY_PLAYER=true, TARGET=true, FOCUS=true, GUILD=true, COMMUNITIES_GUILD_MEMBER=true, COMMUNITIES_MEMBER=true, COMMUNITIES_WOW_MEMBER=true, PVP_SCOREBOARD=true}
+-- Add copy full name to right-click menus and player name list to PvP scoreboards
 
-local function parseNameRealm(full)
+local finderTags = {
+    MENU_LFG_FRAME_SEARCH_ENTRY = true,
+    MENU_LFG_FRAME_MEMBER_APPLY = true,
+}
+local playerTypes = {
+    PLAYER = true, PARTY = true, RAID_PLAYER = true,
+    FRIEND = true, FRIEND_OFFLINE = true, FRIEND_ONLINE = true,
+    BN_FRIEND = true, SELF = true, OTHER_PLAYER = true,
+    ENEMY_PLAYER = true, TARGET = true, FOCUS = true,
+    GUILD = true, COMMUNITIES_GUILD_MEMBER = true,
+    COMMUNITIES_MEMBER = true, COMMUNITIES_WOW_MEMBER = true,
+    PVP_SCOREBOARD = true,
+}
+
+local function SplitNameRealm(full)
     if not full then return nil, nil end
-    local n, r = full:match("^([^-]+)-(.+)$")
-    return n or full, r or GetRealmName()
+    local name, realm = full:match("^([^-]+)-(.+)$")
+    return name or full, realm or GetRealmName()
+
 end
 
-local function extractFinder(owner)
+local function ResolveFinder(owner)
     if not owner then return nil, nil end
     if owner.resultID and C_LFGList then
-        local r = C_LFGList.GetSearchResultInfo(owner.resultID)
-        if r and r.leaderName then return parseNameRealm(r.leaderName) end
+        local result = C_LFGList.GetSearchResultInfo(owner.resultID)
+        if result and result.leaderName then return SplitNameRealm(result.leaderName) end
     end
     if owner.memberIdx then
-        local p = owner:GetParent()
-        if p and p.applicantID and C_LFGList then
-            local n = C_LFGList.GetApplicantMemberInfo(p.applicantID, owner.memberIdx)
-            if n then return parseNameRealm(n) end
+        local parent = owner:GetParent()
+        if parent and parent.applicantID and C_LFGList then
+            local name = C_LFGList.GetApplicantMemberInfo(parent.applicantID, owner.memberIdx)
+            if name then return SplitNameRealm(name) end
         end
     end
     return nil, nil
 end
 
-local function resolvePlayer(owner, root, ctx)
+local function ResolvePlayer(owner, root, ctx)
     if not ctx then
-        if root and root.tag and finderTags[root.tag] then return extractFinder(owner) end
+        if root and root.tag and finderTags[root.tag] then return ResolveFinder(owner) end
         return nil, nil
     end
     if ctx.name and ctx.server then return ctx.name, ctx.server end
     if ctx.which == "PVP_SCOREBOARD" and ctx.unit and C_PvP then
-        local i = C_PvP.GetScoreInfoByPlayerGuid(ctx.unit)
-        if i and i.name then return parseNameRealm(i.name) end
+        local scoreInfo = C_PvP.GetScoreInfoByPlayerGuid(ctx.unit)
+        if scoreInfo and scoreInfo.name then return SplitNameRealm(scoreInfo.name) end
     end
     if ctx.unit and UnitExists(ctx.unit) then
-        local n = UnitName(ctx.unit)
-        if n then local pn, rn = parseNameRealm(n); return pn, ctx.server or rn end
+        local unitName = UnitName(ctx.unit)
+        if unitName then
+            local playerName, realmName = SplitNameRealm(unitName)
+            return playerName, ctx.server or realmName
+        end
     end
     if ctx.accountInfo and ctx.accountInfo.gameAccountInfo then
-        local g = ctx.accountInfo.gameAccountInfo
-        return g.characterName, g.realmName
+        local gameAccount = ctx.accountInfo.gameAccountInfo
+        return gameAccount.characterName, gameAccount.realmName
     end
-    if ctx.name then return parseNameRealm(ctx.name) end
+    if ctx.name then return SplitNameRealm(ctx.name) end
     if ctx.friendsList and C_FriendList then
-        local f = C_FriendList.GetFriendInfoByIndex(ctx.friendsList)
-        if f and f.name then return parseNameRealm(f.name) end
+        local friendInfo = C_FriendList.GetFriendInfoByIndex(ctx.friendsList)
+        if friendInfo and friendInfo.name then return SplitNameRealm(friendInfo.name) end
     end
-    if ctx.chatTarget then return parseNameRealm(ctx.chatTarget) end
+    if ctx.chatTarget then return SplitNameRealm(ctx.chatTarget) end
     return nil, nil
 end
 
-local function showCopyDialog(name)
-    local d = CreateFrame("Frame", nil, UIParent, "BasicFrameTemplateWithInset")
-    d:SetSize(500, 150); d:SetPoint("CENTER"); d:SetMovable(true); d:EnableMouse(true)
-    d:RegisterForDrag("LeftButton"); d:SetScript("OnDragStart", d.StartMoving); d:SetScript("OnDragStop", d.StopMovingOrSizing)
-    d:SetFrameStrata("TOOLTIP"); d:SetFrameLevel(9999)
-    d.title = d:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    d.title:SetPoint("TOP", d.TitleBg, "TOP", 0, -5); d.title:SetText("Copy Full Name")
-    local e = CreateFrame("EditBox", nil, d, "InputBoxTemplate")
-    e:SetSize(460, 30); e:SetPoint("CENTER", d, "CENTER", 0, 10)
-    e:SetText(name or ""); e:SetAutoFocus(true); e:HighlightText()
-    e:SetScript("OnEscapePressed", function() d:Hide() end)
-    e:SetScript("OnEnterPressed", function() d:Hide() end)
-    e:SetScript("OnKeyDown", function(_, k)
-        if k == "C" and (IsControlKeyDown() or IsMetaKeyDown()) then
-            e:HighlightText(); e:SetFocus()
-            C_Timer.After(0, function() if d:IsShown() then d:Hide() end end)
+local function ShowCopyDialog(name)
+    local dialog = CreateFrame("Frame", nil, UIParent, "BasicFrameTemplateWithInset")
+    dialog:SetSize(500, 150)
+    dialog:SetPoint("CENTER")
+    dialog:SetMovable(true)
+    dialog:EnableMouse(true)
+    dialog:RegisterForDrag("LeftButton")
+    dialog:SetScript("OnDragStart", dialog.StartMoving)
+    dialog:SetScript("OnDragStop", dialog.StopMovingOrSizing)
+    dialog:SetFrameStrata("TOOLTIP")
+    dialog:SetFrameLevel(9999)
+    dialog.title = dialog:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    dialog.title:SetPoint("TOP", dialog.TitleBg, "TOP", 0, -5)
+    dialog.title:SetText("Copy Full Name")
+    local input = CreateFrame("EditBox", nil, dialog, "InputBoxTemplate")
+    input:SetSize(460, 30)
+    input:SetPoint("CENTER", dialog, "CENTER", 0, 10)
+    input:SetText(name or "")
+    input:SetAutoFocus(true)
+    input:HighlightText()
+    input:SetScript("OnEscapePressed", function() dialog:Hide() end)
+    input:SetScript("OnEnterPressed", function() dialog:Hide() end)
+    input:SetScript("OnKeyDown", function(_, key)
+        if key == "C" and (IsControlKeyDown() or IsMetaKeyDown()) then
+            input:HighlightText()
+            input:SetFocus()
+            C_Timer.After(0, function() if dialog:IsShown() then dialog:Hide() end end)
         end
     end)
-    local h = d:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    h:SetPoint("BOTTOM", d, "BOTTOM", 0, 20); h:SetText("Ctrl+C / Cmd+C to copy")
-    d:Show()
+    local hint = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    hint:SetPoint("BOTTOM", dialog, "BOTTOM", 0, 20)
+    hint:SetText("Ctrl+C / Cmd+C to copy")
+    dialog:Show()
 end
 
 local processed = {}
-local function addCopyBtn(owner, root, ctx)
+
+local function AddCopyButton(owner, root, ctx)
     if InCombatLockdown() then return end
     if not ctx then
         if not (root and root.tag and finderTags[root.tag]) then return end
     else
         if not (ctx.clubId or (ctx.which and playerTypes[ctx.which])) then return end
     end
-    local n, r = resolvePlayer(owner, root, ctx)
-    if not (n and r and root and root.CreateButton) then return end
-    local key = tostring(root) .. n .. r
+    local name, realm = ResolvePlayer(owner, root, ctx)
+    if not (name and realm and root and root.CreateButton) then return end
+    local key = tostring(root) .. name .. realm
     if processed[key] then return end
     processed[key] = true
     C_Timer.After(0.5, function() processed[key] = nil end)
     if root.CreateDivider then root:CreateDivider() end
     root:CreateButton("Copy Full Name", function()
-        if not InCombatLockdown() then showCopyDialog(n .. "-" .. r) end
+        if not InCombatLockdown() then ShowCopyDialog(name .. "-" .. realm) end
     end)
 end
 
-local menuTags = {"MENU_LFG_FRAME_SEARCH_ENTRY", "MENU_LFG_FRAME_MEMBER_APPLY", "MENU_UNIT_PLAYER", "MENU_UNIT_PARTY", "MENU_UNIT_RAID_PLAYER", "MENU_UNIT_FRIEND", "MENU_UNIT_FRIEND_OFFLINE", "MENU_UNIT_FRIEND_ONLINE", "MENU_UNIT_BN_FRIEND", "MENU_UNIT_SELF", "MENU_UNIT_OTHER_PLAYER", "MENU_UNIT_ENEMY_PLAYER", "MENU_UNIT_TARGET", "MENU_UNIT_FOCUS", "MENU_UNIT_GUILD", "MENU_UNIT_COMMUNITIES_GUILD_MEMBER", "MENU_UNIT_COMMUNITIES_MEMBER", "MENU_UNIT_COMMUNITIES_WOW_MEMBER", "MENU_PVP_SCOREBOARD", "MENU_UNIT_PVP_SCOREBOARD", "MENU_BATTLEGROUND_SCOREBOARD", "MENU_CHAT_LOG_LINK", "MENU_CHAT_LOG_FRAME"}
+local menuTags = {
+    "MENU_LFG_FRAME_SEARCH_ENTRY", "MENU_LFG_FRAME_MEMBER_APPLY",
+    "MENU_UNIT_PLAYER", "MENU_UNIT_PARTY", "MENU_UNIT_RAID_PLAYER",
+    "MENU_UNIT_FRIEND", "MENU_UNIT_FRIEND_OFFLINE", "MENU_UNIT_FRIEND_ONLINE",
+    "MENU_UNIT_BN_FRIEND", "MENU_UNIT_SELF", "MENU_UNIT_OTHER_PLAYER",
+    "MENU_UNIT_ENEMY_PLAYER", "MENU_UNIT_TARGET", "MENU_UNIT_FOCUS",
+    "MENU_UNIT_GUILD", "MENU_UNIT_COMMUNITIES_GUILD_MEMBER",
+    "MENU_UNIT_COMMUNITIES_MEMBER", "MENU_UNIT_COMMUNITIES_WOW_MEMBER",
+    "MENU_PVP_SCOREBOARD", "MENU_UNIT_PVP_SCOREBOARD",
+    "MENU_BATTLEGROUND_SCOREBOARD", "MENU_CHAT_LOG_LINK", "MENU_CHAT_LOG_FRAME",
+}
 
-local function registerMenus()
+local function RegisterMenus()
     if not Menu or not Menu.ModifyMenu then return false end
-    for _, t in ipairs(menuTags) do Menu.ModifyMenu(t, addCopyBtn) end
+    for _, tag in ipairs(menuTags) do
+        Menu.ModifyMenu(tag, AddCopyButton)
+    end
     return true
 end
 
-if not registerMenus() then
-    local a = 0
-    C_Timer.NewTicker(0.5, function(t) a = a + 1; if registerMenus() or a >= 10 then t:Cancel() end end)
+if not RegisterMenus() then
+    local attempts = 0
+    C_Timer.NewTicker(0.5, function(ticker)
+        attempts = attempts + 1
+        if RegisterMenus() or attempts >= 10 then ticker:Cancel() end
+    end)
 end
 
--- Scoreboard
+-- Show scrollable name list dialog for PvP scoreboard panels
+
 local namesDialog
-local function showNamesDialog(names)
-    if namesDialog and namesDialog:IsShown() then namesDialog:Hide(); return end
+
+local function ShowNamesDialog(names)
+    if namesDialog and namesDialog:IsShown() then
+        namesDialog:Hide()
+        return
+    end
     if namesDialog then
         namesDialog.input:SetText(table.concat(names, "\n"))
         namesDialog.input:SetCursorPosition(0)
         namesDialog:Show()
         return
     end
-    local d = CreateFrame("Frame", nil, UIParent, "BasicFrameTemplateWithInset")
-    d:SetSize(500, 400); d:SetPoint("CENTER"); d:SetMovable(true); d:EnableMouse(true)
-    d:RegisterForDrag("LeftButton"); d:SetScript("OnDragStart", d.StartMoving); d:SetScript("OnDragStop", d.StopMovingOrSizing)
-    d:SetFrameStrata("FULLSCREEN_DIALOG"); d:SetFrameLevel(1000)
-    d.title = d:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    d.title:SetPoint("TOP", d.TitleBg, "TOP", 0, -5); d.title:SetText("Player Names")
-    local sf = CreateFrame("ScrollFrame", nil, d, "UIPanelScrollFrameTemplate")
-    sf:SetPoint("TOPLEFT", d, "TOPLEFT", 12, -30); sf:SetPoint("BOTTOMRIGHT", d, "BOTTOMRIGHT", -30, 50)
-    local i = CreateFrame("EditBox", nil, sf)
-    i:SetMultiLine(true); i:SetMaxLetters(0); i:SetFontObject(GameFontHighlight)
-    i:SetWidth(sf:GetWidth() - 20); i:SetHeight(5000); i:SetAutoFocus(false)
-    i:SetScript("OnEscapePressed", function() d:Hide() end)
-    sf:SetScrollChild(i)
-    i:SetText(table.concat(names, "\n")); i:SetCursorPosition(0)
-    local h = d:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    h:SetPoint("BOTTOM", d, "BOTTOM", 0, 20); h:SetText("Ctrl+C / Cmd+C to copy")
-    d.input = i; namesDialog = d; d:Show()
+
+    local dialog = CreateFrame("Frame", nil, UIParent, "BasicFrameTemplateWithInset")
+    dialog:SetSize(500, 400)
+    dialog:SetPoint("CENTER")
+    dialog:SetMovable(true)
+    dialog:EnableMouse(true)
+    dialog:RegisterForDrag("LeftButton")
+    dialog:SetScript("OnDragStart", dialog.StartMoving)
+    dialog:SetScript("OnDragStop", dialog.StopMovingOrSizing)
+    dialog:SetFrameStrata("FULLSCREEN_DIALOG")
+    dialog:SetFrameLevel(1000)
+    dialog.title = dialog:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    dialog.title:SetPoint("TOP", dialog.TitleBg, "TOP", 0, -5)
+    dialog.title:SetText("Player Names")
+    local scrollFrame = CreateFrame("ScrollFrame", nil, dialog, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", dialog, "TOPLEFT", 12, -30)
+    scrollFrame:SetPoint("BOTTOMRIGHT", dialog, "BOTTOMRIGHT", -30, 50)
+    local editBox = CreateFrame("EditBox", nil, scrollFrame)
+    editBox:SetMultiLine(true)
+    editBox:SetMaxLetters(0)
+    editBox:SetFontObject(GameFontHighlight)
+    editBox:SetWidth(scrollFrame:GetWidth() - 20)
+    editBox:SetHeight(5000)
+    editBox:SetAutoFocus(false)
+    editBox:SetScript("OnEscapePressed", function() dialog:Hide() end)
+    scrollFrame:SetScrollChild(editBox)
+    editBox:SetText(table.concat(names, "\n"))
+    editBox:SetCursorPosition(0)
+    local hint = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    hint:SetPoint("BOTTOM", dialog, "BOTTOM", 0, 20)
+    hint:SetText("Ctrl+C / Cmd+C to copy")
+    dialog.input = editBox
+    namesDialog = dialog
+    dialog:Show()
 end
 
-local function extractNames(cf, cb)
-    if not cf then cb({}); return end
+local function ExtractNames(contentFrame, callback)
+    if not contentFrame then callback({}) return end
     local names, found = {}, {}
-    local ignore = {Name=true, Deaths=true, All=true, Progress=true}
-    local sb = cf.scrollBox or cf.ScrollBox
-    if not sb or not sb.ScrollTarget then cb({}); return end
-    for _, c in ipairs({sb.ScrollTarget:GetChildren()}) do
-        if c then
-            for _, gc in ipairs({c:GetChildren()}) do
-                if gc and gc.text and type(gc.text) == "table" and gc.text.GetText then
-                    local t = gc.text:GetText()
-                    if t and t ~= "" and not ignore[t] and not found[t] and not t:match("%d") then
-                        found[t] = true; names[#names+1] = t
+    local ignore = { Name = true, Deaths = true, All = true, Progress = true }
+    local scrollBox = contentFrame.scrollBox or contentFrame.ScrollBox
+    if not scrollBox or not scrollBox.ScrollTarget then callback({}) return end
+    for _, child in ipairs({ scrollBox.ScrollTarget:GetChildren() }) do
+        if child then
+            for _, grandChild in ipairs({ child:GetChildren() }) do
+                if grandChild and grandChild.text and type(grandChild.text) == "table" and grandChild.text.GetText then
+                    local text = grandChild.text:GetText()
+                    if text and text ~= "" and not ignore[text] and not found[text] and not text:match("%d") then
+                        found[text] = true
+                        names[#names + 1] = text
                     end
                 end
             end
         end
     end
-    cb(names)
+    callback(names)
 end
 
-local function createNamesBtn(p)
-    if not p or p.namesBtn then return end
-    local cf = p.Content or p.content
-    if not cf then return end
-    local b = CreateFrame("Button", nil, cf, "UIPanelButtonTemplate")
-    b:SetSize(120, 25); b:SetText("Player Names"); b:SetPoint("BOTTOMRIGHT", cf, "BOTTOMRIGHT", -10, 10)
-    b:SetScript("OnClick", function()
+local function CreateNamesButton(panel)
+    if not panel or panel.namesBtn then return end
+    local contentFrame = panel.Content or panel.content
+    if not contentFrame then return end
+    local button = CreateFrame("Button", nil, contentFrame, "UIPanelButtonTemplate")
+    button:SetSize(120, 25)
+    button:SetText("Player Names")
+    button:SetPoint("BOTTOMRIGHT", contentFrame, "BOTTOMRIGHT", -10, 10)
+    button:SetScript("OnClick", function()
         if InCombatLockdown() then return end
-        if namesDialog then namesDialog:Hide(); namesDialog = nil end
-        C_Timer.After(0.2, function() extractNames(cf, function(n) if #n > 0 then showNamesDialog(n) end end) end)
+        if namesDialog then namesDialog:Hide() namesDialog = nil end
+        C_Timer.After(0.2, function()
+            ExtractNames(contentFrame, function(names)
+                if #names > 0 then ShowNamesDialog(names) end
+            end)
+        end)
     end)
-    p.namesBtn = b
+    panel.namesBtn = button
 end
 
-local function setupScoreboard()
-    if PVPMatchScoreboard then createNamesBtn(PVPMatchScoreboard) end
-    if PVPMatchResults then createNamesBtn(PVPMatchResults) end
+local function SetupScoreboard()
+    if PVPMatchScoreboard then CreateNamesButton(PVPMatchScoreboard) end
+    if PVPMatchResults then CreateNamesButton(PVPMatchResults) end
 end
 
-local ef = CreateFrame("Frame")
-ef:RegisterEvent("ADDON_LOADED")
-ef:SetScript("OnEvent", function(_, _, addon)
+local pvpUIFrm = CreateFrame("Frame")
+pvpUIFrm:RegisterEvent("ADDON_LOADED")
+pvpUIFrm:SetScript("OnEvent", function(_, _, addon)
     if addon == "Blizzard_PVPUI" then
-        setupScoreboard()
-        registerMenus()
-        if PVPMatchScoreboard then PVPMatchScoreboard:HookScript("OnShow", function() createNamesBtn(PVPMatchScoreboard) end) end
-        if PVPMatchResults then PVPMatchResults:HookScript("OnShow", function() createNamesBtn(PVPMatchResults) end) end
-        ef:UnregisterEvent("ADDON_LOADED")
+        SetupScoreboard()
+        RegisterMenus()
+        if PVPMatchScoreboard then
+            PVPMatchScoreboard:HookScript("OnShow", function() CreateNamesButton(PVPMatchScoreboard) end)
+        end
+        if PVPMatchResults then
+            PVPMatchResults:HookScript("OnShow", function() CreateNamesButton(PVPMatchResults) end)
+        end
+        pvpUIFrm:UnregisterEvent("ADDON_LOADED")
     end
 end)
-setupScoreboard()
+SetupScoreboard()
