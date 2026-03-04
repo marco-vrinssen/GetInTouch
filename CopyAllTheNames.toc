@@ -1,8 +1,8 @@
 ## Interface: 120000
-## Title: NameGrabber
+## Title: CopyAllTheNames
 ## Notes: Copy player names from context menus and PvP scoreboard
 ## Author: MIYANKO
 ## Version: 1.0.0
 ## X-Curse-Project-ID: 1454047
 
-NameGrabber.lua
+CopyAllTheNames.lua

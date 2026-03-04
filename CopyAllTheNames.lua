@@ -1,4 +1,4 @@
--- Add copy full name to right-click menus and player name list to PvP scoreboards
+-- Add copy full name to right-click menus and player name list to PvP scoreboards to simplify name copying because default UI has no copy option
 
 local finderTags = {
     MENU_LFG_FRAME_SEARCH_ENTRY = true,
@@ -37,33 +37,33 @@ local function ResolveFinder(owner)
     return nil, nil
 end
 
-local function ResolvePlayer(owner, root, ctx)
-    if not ctx then
+local function ResolvePlayer(owner, root, context)
+    if not context then
         if root and root.tag and finderTags[root.tag] then return ResolveFinder(owner) end
         return nil, nil
     end
-    if ctx.name and ctx.server then return ctx.name, ctx.server end
-    if ctx.which == "PVP_SCOREBOARD" and ctx.unit and C_PvP then
-        local scoreInfo = C_PvP.GetScoreInfoByPlayerGuid(ctx.unit)
+    if context.name and context.server then return context.name, context.server end
+    if context.which == "PVP_SCOREBOARD" and context.unit and C_PvP then
+        local scoreInfo = C_PvP.GetScoreInfoByPlayerGuid(context.unit)
         if scoreInfo and scoreInfo.name then return SplitNameRealm(scoreInfo.name) end
     end
-    if ctx.unit and UnitExists(ctx.unit) then
-        local unitName = UnitName(ctx.unit)
+    if context.unit and UnitExists(context.unit) then
+        local unitName = UnitName(context.unit)
         if unitName then
             local playerName, realmName = SplitNameRealm(unitName)
-            return playerName, ctx.server or realmName
+            return playerName, context.server or realmName
         end
     end
-    if ctx.accountInfo and ctx.accountInfo.gameAccountInfo then
-        local gameAccount = ctx.accountInfo.gameAccountInfo
+    if context.accountInfo and context.accountInfo.gameAccountInfo then
+        local gameAccount = context.accountInfo.gameAccountInfo
         return gameAccount.characterName, gameAccount.realmName
     end
-    if ctx.name then return SplitNameRealm(ctx.name) end
-    if ctx.friendsList and C_FriendList then
-        local friendInfo = C_FriendList.GetFriendInfoByIndex(ctx.friendsList)
+    if context.name then return SplitNameRealm(context.name) end
+    if context.friendsList and C_FriendList then
+        local friendInfo = C_FriendList.GetFriendInfoByIndex(context.friendsList)
         if friendInfo and friendInfo.name then return SplitNameRealm(friendInfo.name) end
     end
-    if ctx.chatTarget then return SplitNameRealm(ctx.chatTarget) end
+    if context.chatTarget then return SplitNameRealm(context.chatTarget) end
     return nil, nil
 end
 
@@ -104,14 +104,14 @@ end
 
 local processed = {}
 
-local function AddCopyButton(owner, root, ctx)
+local function AddCopyButton(owner, root, context)
     if InCombatLockdown() then return end
-    if not ctx then
+    if not context then
         if not (root and root.tag and finderTags[root.tag]) then return end
     else
-        if not (ctx.clubId or (ctx.which and playerTypes[ctx.which])) then return end
+        if not (context.clubId or (context.which and playerTypes[context.which])) then return end
     end
-    local name, realm = ResolvePlayer(owner, root, ctx)
+    local name, realm = ResolvePlayer(owner, root, context)
     if not (name and realm and root and root.CreateButton) then return end
     local key = tostring(root) .. name .. realm
     if processed[key] then return end
@@ -151,7 +151,7 @@ if not RegisterMenus() then
     end)
 end
 
--- Show scrollable name list dialog for PvP scoreboard panels
+-- Show scrollable name list dialog to display all PvP player names because scoreboard has no bulk copy option
 
 local namesDialog
 
@@ -249,9 +249,11 @@ local function SetupScoreboard()
     if PVPMatchResults then CreateNamesButton(PVPMatchResults) end
 end
 
-local pvpUIFrm = CreateFrame("Frame")
-pvpUIFrm:RegisterEvent("ADDON_LOADED")
-pvpUIFrm:SetScript("OnEvent", function(_, _, addon)
+-- Register for PvP UI addon load to attach scoreboard buttons because PvP frames load lazily
+
+local pvpInterfaceFrame = CreateFrame("Frame")
+pvpInterfaceFrame:RegisterEvent("ADDON_LOADED")
+pvpInterfaceFrame:SetScript("OnEvent", function(_, _, addon)
     if addon == "Blizzard_PVPUI" then
         SetupScoreboard()
         RegisterMenus()
@@ -261,7 +263,7 @@ pvpUIFrm:SetScript("OnEvent", function(_, _, addon)
         if PVPMatchResults then
             PVPMatchResults:HookScript("OnShow", function() CreateNamesButton(PVPMatchResults) end)
         end
-        pvpUIFrm:UnregisterEvent("ADDON_LOADED")
+        pvpInterfaceFrame:UnregisterEvent("ADDON_LOADED")
     end
 end)
 SetupScoreboard()
