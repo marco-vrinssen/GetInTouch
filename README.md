@@ -1,6 +1,6 @@
-# Copy All The Names
+# NameGrabber
 
-Minimal WoW addon to copy player names from context menus and PvP scoreboard.
+WoW addon to copy player names from right-click context menus and the PvP scoreboard.
 
 ## Features
 
