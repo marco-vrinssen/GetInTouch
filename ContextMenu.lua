@@ -1,9 +1,10 @@
--- Add copy full name to right-click menus and player name list to PvP scoreboards to simplify name copying because default UI has no copy option
+-- Add copy full name option to right-click context menus to simplify name copying because default UI has no copy option
 
 local finderTags = {
     MENU_LFG_FRAME_SEARCH_ENTRY = true,
     MENU_LFG_FRAME_MEMBER_APPLY = true,
 }
+
 local playerTypes = {
     PLAYER = true, PARTY = true, RAID_PLAYER = true,
     FRIEND = true, FRIEND_OFFLINE = true, FRIEND_ONLINE = true,
@@ -14,12 +15,15 @@ local playerTypes = {
     PVP_SCOREBOARD = true,
 }
 
+-- Split name-realm string into separate values to handle cross-realm players because WoW formats them as "Name-Realm"
+
 local function SplitNameRealm(full)
     if not full then return nil, nil end
     local name, realm = full:match("^([^-]+)-(.+)$")
     return name or full, realm or GetRealmName()
-
 end
+
+-- Resolve player name from LFG finder frames to extract leader or applicant info because finder context differs from unit context
 
 local function ResolveFinder(owner)
     if not owner then return nil, nil end
@@ -36,6 +40,8 @@ local function ResolveFinder(owner)
     end
     return nil, nil
 end
+
+-- Resolve player name and realm from various menu context sources to handle all unit menu types because each provides data differently
 
 local function ResolvePlayer(owner, root, context)
     if not context then
@@ -67,6 +73,8 @@ local function ResolvePlayer(owner, root, context)
     return nil, nil
 end
 
+-- Show small copy dialog with editable name text to let player select and copy because WoW has no clipboard API
+
 local function ShowCopyDialog(name)
     local dialog = CreateFrame("Frame", nil, UIParent, "BasicFrameTemplateWithInset")
     dialog:SetSize(500, 150)
@@ -96,13 +104,15 @@ local function ShowCopyDialog(name)
             C_Timer.After(0, function() if dialog:IsShown() then dialog:Hide() end end)
         end
     end)
-    local hint = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    hint:SetPoint("BOTTOM", dialog, "BOTTOM", 0, 20)
-    hint:SetText("Ctrl+C / Cmd+C to copy")
+
     dialog:Show()
 end
 
+-- Track processed menu entries to prevent duplicate copy buttons from appearing because ModifyMenu fires multiple times
+
 local processed = {}
+
+-- Add copy full name button to context menu to enable one-click name copying because default menus lack this option
 
 local function AddCopyButton(owner, root, context)
     if InCombatLockdown() then return end
@@ -113,6 +123,8 @@ local function AddCopyButton(owner, root, context)
     end
     local name, realm = ResolvePlayer(owner, root, context)
     if not (name and realm and root and root.CreateButton) then return end
+    name = tostring(name)
+    realm = tostring(realm)
     local key = tostring(root) .. name .. realm
     if processed[key] then return end
     processed[key] = true
@@ -122,6 +134,8 @@ local function AddCopyButton(owner, root, context)
         if not InCombatLockdown() then ShowCopyDialog(name .. "-" .. realm) end
     end)
 end
+
+-- Register copy button on all relevant menu tags to cover every player interaction context because menus use different tag identifiers
 
 local menuTags = {
     "MENU_LFG_FRAME_SEARCH_ENTRY", "MENU_LFG_FRAME_MEMBER_APPLY",
@@ -134,6 +148,8 @@ local menuTags = {
     "MENU_PVP_SCOREBOARD", "MENU_UNIT_PVP_SCOREBOARD",
     "MENU_BATTLEGROUND_SCOREBOARD", "MENU_CHAT_LOG_LINK", "MENU_CHAT_LOG_FRAME",
 }
+
+-- Attempt menu registration with retry to handle late Menu API availability because the API may not exist at initial load
 
 local function RegisterMenus()
     if not Menu or not Menu.ModifyMenu then return false end
@@ -151,119 +167,12 @@ if not RegisterMenus() then
     end)
 end
 
--- Show scrollable name list dialog to display all PvP player names because scoreboard has no bulk copy option
+-- Re-register menus when PvP UI loads to cover PvP-specific menu tags because they only become available after Blizzard_PVPUI loads
 
-local namesDialog
-
-local function ShowNamesDialog(names)
-    if namesDialog and namesDialog:IsShown() then
-        namesDialog:Hide()
-        return
-    end
-    if namesDialog then
-        namesDialog.input:SetText(table.concat(names, "\n"))
-        namesDialog.input:SetCursorPosition(0)
-        namesDialog:Show()
-        return
-    end
-
-    local dialog = CreateFrame("Frame", nil, UIParent, "BasicFrameTemplateWithInset")
-    dialog:SetSize(500, 400)
-    dialog:SetPoint("CENTER")
-    dialog:SetMovable(true)
-    dialog:EnableMouse(true)
-    dialog:RegisterForDrag("LeftButton")
-    dialog:SetScript("OnDragStart", dialog.StartMoving)
-    dialog:SetScript("OnDragStop", dialog.StopMovingOrSizing)
-    dialog:SetFrameStrata("FULLSCREEN_DIALOG")
-    dialog:SetFrameLevel(1000)
-    dialog.title = dialog:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    dialog.title:SetPoint("TOP", dialog.TitleBg, "TOP", 0, -5)
-    dialog.title:SetText("Player Names")
-    local scrollFrame = CreateFrame("ScrollFrame", nil, dialog, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", dialog, "TOPLEFT", 12, -30)
-    scrollFrame:SetPoint("BOTTOMRIGHT", dialog, "BOTTOMRIGHT", -30, 50)
-    local editBox = CreateFrame("EditBox", nil, scrollFrame)
-    editBox:SetMultiLine(true)
-    editBox:SetMaxLetters(0)
-    editBox:SetFontObject(GameFontHighlight)
-    editBox:SetWidth(scrollFrame:GetWidth() - 20)
-    editBox:SetHeight(5000)
-    editBox:SetAutoFocus(false)
-    editBox:SetScript("OnEscapePressed", function() dialog:Hide() end)
-    scrollFrame:SetScrollChild(editBox)
-    editBox:SetText(table.concat(names, "\n"))
-    editBox:SetCursorPosition(0)
-    local hint = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    hint:SetPoint("BOTTOM", dialog, "BOTTOM", 0, 20)
-    hint:SetText("Ctrl+C / Cmd+C to copy")
-    dialog.input = editBox
-    namesDialog = dialog
-    dialog:Show()
-end
-
-local function ExtractNames(contentFrame, callback)
-    if not contentFrame then callback({}) return end
-    local names, found = {}, {}
-    local ignore = { Name = true, Deaths = true, All = true, Progress = true }
-    local scrollBox = contentFrame.scrollBox or contentFrame.ScrollBox
-    if not scrollBox or not scrollBox.ScrollTarget then callback({}) return end
-    for _, child in ipairs({ scrollBox.ScrollTarget:GetChildren() }) do
-        if child then
-            for _, grandChild in ipairs({ child:GetChildren() }) do
-                if grandChild and grandChild.text and type(grandChild.text) == "table" and grandChild.text.GetText then
-                    local text = grandChild.text:GetText()
-                    if text and text ~= "" and not ignore[text] and not found[text] and not text:match("%d") then
-                        found[text] = true
-                        names[#names + 1] = text
-                    end
-                end
-            end
-        end
-    end
-    callback(names)
-end
-
-local function CreateNamesButton(panel)
-    if not panel or panel.namesBtn then return end
-    local contentFrame = panel.Content or panel.content
-    if not contentFrame then return end
-    local button = CreateFrame("Button", nil, contentFrame, "UIPanelButtonTemplate")
-    button:SetSize(120, 25)
-    button:SetText("Player Names")
-    button:SetPoint("BOTTOMRIGHT", contentFrame, "BOTTOMRIGHT", -10, 10)
-    button:SetScript("OnClick", function()
-        if InCombatLockdown() then return end
-        if namesDialog then namesDialog:Hide() namesDialog = nil end
-        C_Timer.After(0.2, function()
-            ExtractNames(contentFrame, function(names)
-                if #names > 0 then ShowNamesDialog(names) end
-            end)
-        end)
-    end)
-    panel.namesBtn = button
-end
-
-local function SetupScoreboard()
-    if PVPMatchScoreboard then CreateNamesButton(PVPMatchScoreboard) end
-    if PVPMatchResults then CreateNamesButton(PVPMatchResults) end
-end
-
--- Register for PvP UI addon load to attach scoreboard buttons because PvP frames load lazily
-
-local pvpInterfaceFrame = CreateFrame("Frame")
-pvpInterfaceFrame:RegisterEvent("ADDON_LOADED")
-pvpInterfaceFrame:SetScript("OnEvent", function(_, _, addon)
+local contextMenuFrame = CreateFrame("Frame")
+contextMenuFrame:RegisterEvent("ADDON_LOADED")
+contextMenuFrame:SetScript("OnEvent", function(_, _, addon)
     if addon == "Blizzard_PVPUI" then
-        SetupScoreboard()
         RegisterMenus()
-        if PVPMatchScoreboard then
-            PVPMatchScoreboard:HookScript("OnShow", function() CreateNamesButton(PVPMatchScoreboard) end)
-        end
-        if PVPMatchResults then
-            PVPMatchResults:HookScript("OnShow", function() CreateNamesButton(PVPMatchResults) end)
-        end
-        pvpInterfaceFrame:UnregisterEvent("ADDON_LOADED")
     end
 end)
-SetupScoreboard()

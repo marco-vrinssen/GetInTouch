@@ -1,8 +1,10 @@
 ## Interface: 120000
 ## Title: CopyAllTheNames
-## Notes: Copy player names from context menus and PvP scoreboard
+## Notes: Copy player names from context menus, PvP scoreboard, and auction house seller lists
 ## Author: MIYANKO
 ## Version: 1.0.0
 ## X-Curse-Project-ID: 1454047
 
-CopyAllTheNames.lua
+ContextMenu.lua
+Battleground.lua
+Auction.lua
