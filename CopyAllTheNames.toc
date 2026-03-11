@@ -4,7 +4,7 @@
 ## Author: MIYANKO
 ## Version: 1.0.0
 
-Popup.lua
-Battleground.lua
-Auction.lua
-ContextMenu.lua
+CopyPopup.lua
+PlayerNames.lua
+ScoreboardNames.lua
+SellerNames.lua
