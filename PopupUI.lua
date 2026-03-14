@@ -1,82 +1,100 @@
--- Shared UI primitives, copy popup, and scrollable names dialog
+-- Initialize global namespace for the addon to share functions between modules because the addon uses multiple separate Lua files
 
 CopyAllTheNames = CopyAllTheNames or {}
 
+-- Declare local variables for UI components and row pooling to manage state because frames should be reused avoiding memory leaks
+
 local namesDialog
-local rowPool      = {}
+local rowPool = {}
 local copyPopup
 local currentNames = {}
 
-local ROW_HEIGHT = 34
+-- Define consistent row height for the scrollable list to calculate offsets because dynamically sizing rows is inefficient
 
-local TOOLTIP_BACKDROP = {
-    bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
+local rowHeight = 34
+
+-- Define backdrop configuration for tooltips and dialogs to ensure consistent styling because default frame borders look outdated
+
+local tooltipBackdrop = {
+    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-    tile     = true,
+    tile = true,
     tileSize = 8,
     edgeSize = 16,
-    insets   = { left = 4, right = 4, top = 4, bottom = 4 },
+    insets = { left = 4, right = 4, top = 4, bottom = 4 },
 }
 
-local function ApplyTooltipStyle(frame)
-    frame:SetBackdrop(TOOLTIP_BACKDROP)
+-- Apply the dark tooltip style to a given frame to match modern UI aesthetics because standard dialog backgrounds are too bright
+
+local function applyTooltipStyle(frame)
+    frame:SetBackdrop(tooltipBackdrop)
     frame:SetBackdropColor(0.06, 0.06, 0.06, 0.97)
     frame:SetBackdropBorderColor(0.8, 0.8, 0.8, 0.9)
 end
 
-local function ApplyClassicButtonStyle(btn)
-    local normal    = btn:GetNormalTexture()
-    local pushed    = btn:GetPushedTexture()
-    local highlight = btn:GetHighlightTexture()
-    local disabled  = btn:GetDisabledTexture()
+-- Force button textures to use the classic styling atlas to maintain visual coherence because the UI mixes old and new widget styles
 
-    if normal    then normal:SetAtlas("UI-Panel-Button-Up", true) end
-    if pushed    then pushed:SetAtlas("UI-Panel-Button-Down", true) end
-    if highlight then highlight:SetAtlas("UI-Panel-Button-Highlight", true) end
-    if disabled  then disabled:SetAtlas("UI-Panel-Button-Disabled", true) end
+local function applyClassicButtonStyle(buttonFrame)
+    local normalTexture = buttonFrame:GetNormalTexture()
+    local pushedTexture = buttonFrame:GetPushedTexture()
+    local highlightTexture = buttonFrame:GetHighlightTexture()
+    local disabledTexture = buttonFrame:GetDisabledTexture()
 
-    if normal then normal:SetTexCoord(0, 1, 0, 1) end
-    if pushed then pushed:SetTexCoord(0, 1, 0, 1) end
+    if normalTexture then normalTexture:SetAtlas("UI-Panel-Button-Up", true) end
+    if pushedTexture then pushedTexture:SetAtlas("UI-Panel-Button-Down", true) end
+    if highlightTexture then highlightTexture:SetAtlas("UI-Panel-Button-Highlight", true) end
+    if disabledTexture then disabledTexture:SetAtlas("UI-Panel-Button-Disabled", true) end
 
-    btn:GetFontString():SetTextColor(1, 0.82, 0)
+    if normalTexture then normalTexture:SetTexCoord(0, 1, 0, 1) end
+    if pushedTexture then pushedTexture:SetTexCoord(0, 1, 0, 1) end
+
+    buttonFrame:GetFontString():SetTextColor(1, 0.82, 0)
 end
 
-local function CreateActionButton(parent, label, width, onClick)
-    local btn = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    btn:SetSize(width, 22)
-    btn:SetText(label)
-    btn:SetScript("OnClick", onClick)
-    ApplyClassicButtonStyle(btn)
-    return btn
+-- Create a standard action button with the classic style applied to simplify UI creation because writing this logic inline clutters layouts
+
+local function createActionButton(parentFrame, labelText, buttonWidth, clickHandler)
+    local buttonFrame = CreateFrame("Button", nil, parentFrame, "UIPanelButtonTemplate")
+
+    buttonFrame:SetSize(buttonWidth, 22)
+    buttonFrame:SetText(labelText)
+    buttonFrame:SetScript("OnClick", clickHandler)
+
+    applyClassicButtonStyle(buttonFrame)
+
+    return buttonFrame
 end
 
-local function CreateSeparator(parent, layer, fromPoint, toPoint, offsetY)
-    local line = parent:CreateTexture(nil, layer or "OVERLAY")
-    line:SetHeight(1)
-    line:SetPoint(fromPoint, parent, fromPoint,  8, offsetY)
-    line:SetPoint(toPoint,   parent, toPoint,   -8, offsetY)
-    line:SetColorTexture(0.8, 0.8, 0.8, 0.15)
-    return line
+-- Create a subtle horizontal line texture to divide sections visually because floating elements without borders lack grouping
+
+local function createSeparator(parentFrame, textureLayer, anchorFrom, anchorTo, verticalOffset)
+    local separatorLine = parentFrame:CreateTexture(nil, textureLayer or "OVERLAY")
+
+    separatorLine:SetHeight(1)
+    separatorLine:SetPoint(anchorFrom, parentFrame, anchorFrom, 8, verticalOffset)
+    separatorLine:SetPoint(anchorTo, parentFrame, anchorTo, -8, verticalOffset)
+    separatorLine:SetColorTexture(0.8, 0.8, 0.8, 0.15)
+
+    return separatorLine
 end
 
---------------------------------------------------------------------------------
--- Row button width — measure Whisper (widest label) and apply to all buttons
---------------------------------------------------------------------------------
+-- Measure the width of the longest action button label to size all row buttons uniformly because misaligned interface buttons look unprofessional
 
-local BTN_PADDING   = 20
-local ROW_BTN_WIDTH = (function()
-    local probe = CreateFrame("Button", nil, UIParent, "UIPanelButtonTemplate")
-    probe:SetText("Whisper")
-    local width = probe:GetFontString():GetStringWidth() + BTN_PADDING
-    probe:Hide()
-    return math.max(width, 70)
+local buttonPadding = 20
+local rowButtonWidth = (function()
+    local probeButton = CreateFrame("Button", nil, UIParent, "UIPanelButtonTemplate")
+    probeButton:SetText("Whisper")
+
+    local buttonWidth = probeButton:GetFontString():GetStringWidth() + buttonPadding
+
+    probeButton:Hide()
+
+    return math.max(buttonWidth, 70)
 end)()
 
---------------------------------------------------------------------------------
--- Copy popup
---------------------------------------------------------------------------------
+-- Open a text input dialog framing the provided string to facilitate copying because the user cannot highlight standard font strings
 
-function CopyAllTheNames.OpenCopyPopup(name)
+function CopyAllTheNames.openCopyPopup(playerName)
     if not copyPopup then
         copyPopup = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
         copyPopup:SetSize(300, 110)
@@ -86,8 +104,9 @@ function CopyAllTheNames.OpenCopyPopup(name)
         copyPopup:EnableMouse(true)
         copyPopup:RegisterForDrag("LeftButton")
         copyPopup:SetScript("OnDragStart", copyPopup.StartMoving)
-        copyPopup:SetScript("OnDragStop",  copyPopup.StopMovingOrSizing)
-        ApplyTooltipStyle(copyPopup)
+        copyPopup:SetScript("OnDragStop", copyPopup.StopMovingOrSizing)
+
+        applyTooltipStyle(copyPopup)
 
         local titleText = copyPopup:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         titleText:SetPoint("TOP", copyPopup, "TOP", 0, -10)
@@ -99,23 +118,22 @@ function CopyAllTheNames.OpenCopyPopup(name)
         closeButton:SetFrameLevel(copyPopup:GetFrameLevel() + 10)
         closeButton:SetScript("OnClick", function() copyPopup:Hide() end)
 
-        CreateSeparator(copyPopup, "OVERLAY", "TOPLEFT",    "TOPRIGHT",    -26)
-        CreateSeparator(copyPopup, "OVERLAY", "BOTTOMLEFT", "BOTTOMRIGHT",  22)
+        createSeparator(copyPopup, "OVERLAY", "TOPLEFT", "TOPRIGHT", -26)
+        createSeparator(copyPopup, "OVERLAY", "BOTTOMLEFT", "BOTTOMRIGHT", 22)
 
-        -- Edit box vertically centered between the two separators
-        -- Top separator at -26 from top, bottom separator at +22 from bottom (110-22=88 from top)
-        -- Mid point of zone = (26+88)/2 = 57px from top; frame center = 55px; offset = 55-57 = -2
         local editBox = CreateFrame("EditBox", nil, copyPopup, "InputBoxTemplate")
         editBox:SetSize(260, 24)
         editBox:SetPoint("CENTER", copyPopup, "CENTER", 0, -2)
         editBox:SetAutoFocus(true)
         editBox:SetScript("OnEscapePressed", function() copyPopup:Hide() end)
-        editBox:SetScript("OnEnterPressed",  function() copyPopup:Hide() end)
-        editBox:SetScript("OnKeyDown", function(_, key)
-            if key == "C" and (IsControlKeyDown() or (IsMetaKeyDown and IsMetaKeyDown())) then
+        editBox:SetScript("OnEnterPressed", function() copyPopup:Hide() end)
+
+        editBox:SetScript("OnKeyDown", function(_, keyPress)
+            if keyPress == "C" and (IsControlKeyDown() or (IsMetaKeyDown and IsMetaKeyDown())) then
                 C_Timer.After(0, function() copyPopup:Hide() end)
             end
         end)
+
         copyPopup.editBox = editBox
 
         local hintText = copyPopup:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -124,158 +142,172 @@ function CopyAllTheNames.OpenCopyPopup(name)
         hintText:SetTextColor(1, 1, 1, 1)
     end
 
-    copyPopup.editBox:SetText(name)
+    copyPopup.editBox:SetText(playerName)
     copyPopup.editBox:HighlightText()
     copyPopup:Show()
 end
 
---------------------------------------------------------------------------------
--- /whisperall
---------------------------------------------------------------------------------
+-- Define slash command to whisper all collected names to support bulk communication because manually whispering list members is slow
 
 SLASH_COPYALLTHENAMES_WHISPERALL1 = "/whisperall"
-SlashCmdList["COPYALLTHENAMES_WHISPERALL"] = function(message)
-    if not message or message == "" then
+SlashCmdList["COPYALLTHENAMES_WHISPERALL"] = function(chatMessage)
+    if not chatMessage or chatMessage == "" then
         print("|cffff9900CopyAllTheNames:|r Usage: /whisperall <message>")
         return
     end
+
     if #currentNames == 0 then
         print("|cffff9900CopyAllTheNames:|r No players in the current list.")
         return
     end
-    for _, playerName in ipairs(currentNames) do
-        pcall(SendChatMessage, message, "WHISPER", nil, playerName)
+
+    for _, targetPlayerName in ipairs(currentNames) do
+        pcall(SendChatMessage, chatMessage, "WHISPER", nil, targetPlayerName)
     end
 end
 
---------------------------------------------------------------------------------
--- Row definitions
---------------------------------------------------------------------------------
+-- Store generic handlers for list interaction buttons to populate row actions dynamically because duplicating button configuration code is error prone
 
-local ROW_DEFINITIONS = {
-    { label = "Copy",    handler = function(n) CopyAllTheNames.OpenCopyPopup(n) end },
-    { label = "Whisper", handler = function(n) pcall(ChatFrame_OpenChat, "/w " .. n .. " ", DEFAULT_CHAT_FRAME) end },
-    { label = "Invite",  handler = function(n) pcall(C_PartyInfo.ConfirmInviteUnit, n) end, combatLocked = true },
+local actionDefinitions = {
+    { label = "Copy", handler = function(targetName) CopyAllTheNames.openCopyPopup(targetName) end },
+    { label = "Whisper", handler = function(targetName) pcall(ChatFrame_OpenChat, "/w " .. targetName .. " ", DEFAULT_CHAT_FRAME) end },
+    { label = "Invite", handler = function(targetName) pcall(C_PartyInfo.ConfirmInviteUnit, targetName) end, isCombatLocked = true },
 }
 
-local function CreatePlayerRow(scrollChild, rowIndex)
-    local row = CreateFrame("Frame", nil, scrollChild)
-    row:SetSize(scrollChild:GetWidth(), ROW_HEIGHT)
-    row:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -(rowIndex - 1) * ROW_HEIGHT)
+-- Create a new reusable list row containing a name and interaction buttons to display entries because the dialog needs to handle variable lengths
 
-    local separator = row:CreateTexture(nil, "ARTWORK")
-    separator:SetHeight(1)
-    separator:SetPoint("BOTTOMLEFT",  row, "BOTTOMLEFT",  4, 0)
-    separator:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -4, 0)
-    separator:SetColorTexture(0.8, 0.8, 0.8, 0.08)
+local function createPlayerRow(scrollChildFrame, rowIndex)
+    local playerRow = CreateFrame("Frame", nil, scrollChildFrame)
 
-    local label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    label:SetPoint("LEFT", row, "LEFT", 8, 0)
-    label:SetJustifyH("LEFT")
-    row.nameLabel = label
+    playerRow:SetSize(scrollChildFrame:GetWidth(), rowHeight)
+    playerRow:SetPoint("TOPLEFT", scrollChildFrame, "TOPLEFT", 0, -(rowIndex - 1) * rowHeight)
 
-    local btnSpacing  = 4
-    row.actionButtons = {}
+    local rowSeparator = playerRow:CreateTexture(nil, "ARTWORK")
+    rowSeparator:SetHeight(1)
+    rowSeparator:SetPoint("BOTTOMLEFT", playerRow, "BOTTOMLEFT", 4, 0)
+    rowSeparator:SetPoint("BOTTOMRIGHT", playerRow, "BOTTOMRIGHT", -4, 0)
+    rowSeparator:SetColorTexture(0.8, 0.8, 0.8, 0.08)
 
-    for i = #ROW_DEFINITIONS, 1, -1 do
-        local def    = ROW_DEFINITIONS[i]
-        local offset = (#ROW_DEFINITIONS - i) * (ROW_BTN_WIDTH + btnSpacing)
-        local btn    = CreateActionButton(row, def.label, ROW_BTN_WIDTH, function()
-            if def.combatLocked and InCombatLockdown() then return end
-            if row.playerName then def.handler(row.playerName) end
+    local nameLabel = playerRow:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    nameLabel:SetPoint("LEFT", playerRow, "LEFT", 8, 0)
+    nameLabel:SetJustifyH("LEFT")
+
+    playerRow.nameLabel = nameLabel
+    playerRow.actionButtons = {}
+
+    local buttonSpacing = 4
+
+    for buttonIndex = #actionDefinitions, 1, -1 do
+        local definition = actionDefinitions[buttonIndex]
+        local horizontalOffset = (#actionDefinitions - buttonIndex) * (rowButtonWidth + buttonSpacing)
+
+        local actionButton = createActionButton(playerRow, definition.label, rowButtonWidth, function()
+            if definition.isCombatLocked and InCombatLockdown() then return end
+            if playerRow.playerName then definition.handler(playerRow.playerName) end
         end)
-        btn:SetPoint("RIGHT", row, "RIGHT", -offset, 0)
-        row.actionButtons[i] = btn
+
+        actionButton:SetPoint("RIGHT", playerRow, "RIGHT", -horizontalOffset, 0)
+        playerRow.actionButtons[buttonIndex] = actionButton
     end
 
-    return row
+    return playerRow
 end
 
-local function UpdateNamesDialog(names)
+-- Populate the scroll list with collected names reusing frame object references to render the interface efficiently because making frames each time hurts performance
+
+local function updateNamesDialog(playerNamesList)
     if not namesDialog then return end
-    currentNames = names
+
+    currentNames = playerNamesList
 
     local scrollChild = namesDialog.scrollChild
-    local count       = #names
+    local listCount = #playerNamesList
 
-    for i = 1, count do
-        local row = rowPool[i]
-        if not row then
-            row        = CreatePlayerRow(scrollChild, i)
-            rowPool[i] = row
+    for entryIndex = 1, listCount do
+        local playerRow = rowPool[entryIndex]
+
+        if not playerRow then
+            playerRow = createPlayerRow(scrollChild, entryIndex)
+            rowPool[entryIndex] = playerRow
         end
-        row.playerName = names[i]
-        row.nameLabel:SetText(names[i])
-        row:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -(i - 1) * ROW_HEIGHT)
-        row:Show()
+
+        playerRow.playerName = playerNamesList[entryIndex]
+        playerRow.nameLabel:SetText(playerNamesList[entryIndex])
+        playerRow:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, -(entryIndex - 1) * rowHeight)
+        playerRow:Show()
     end
 
-    for i = count + 1, #rowPool do
-        rowPool[i]:Hide()
+    for unusedIndex = listCount + 1, #rowPool do
+        rowPool[unusedIndex]:Hide()
     end
 
-    scrollChild:SetHeight(math.max(count * ROW_HEIGHT, 1))
+    scrollChild:SetHeight(math.max(listCount * rowHeight, 1))
 end
 
-local function ShowNamesDialog(names)
-    if not namesDialog then
-        local dialog = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
-        dialog:SetSize(450, 420)
-        dialog:SetPoint("CENTER")
-        dialog:SetMovable(true)
-        dialog:EnableMouse(true)
-        dialog:RegisterForDrag("LeftButton")
-        dialog:SetScript("OnDragStart", dialog.StartMoving)
-        dialog:SetScript("OnDragStop",  dialog.StopMovingOrSizing)
-        dialog:SetFrameStrata("FULLSCREEN_DIALOG")
-        dialog:SetFrameLevel(1000)
-        ApplyTooltipStyle(dialog)
+-- Initialize and display the main interface containing collected names to provide bulk actions because viewing multiple scraped names requires a dedicated window
 
-        local titleText = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        titleText:SetPoint("TOP", dialog, "TOP", 0, -10)
+local function showNamesDialog(playerNamesList)
+    if not namesDialog then
+        local mainDialog = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+
+        mainDialog:SetSize(450, 420)
+        mainDialog:SetPoint("CENTER")
+        mainDialog:SetMovable(true)
+        mainDialog:EnableMouse(true)
+        mainDialog:RegisterForDrag("LeftButton")
+        mainDialog:SetScript("OnDragStart", mainDialog.StartMoving)
+        mainDialog:SetScript("OnDragStop", mainDialog.StopMovingOrSizing)
+        mainDialog:SetFrameStrata("FULLSCREEN_DIALOG")
+        mainDialog:SetFrameLevel(1000)
+
+        applyTooltipStyle(mainDialog)
+
+        local titleText = mainDialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        titleText:SetPoint("TOP", mainDialog, "TOP", 0, -10)
         titleText:SetText("Player Names")
 
-        local closeButton = CreateFrame("Button", nil, dialog, "UIPanelCloseButton")
+        local closeButton = CreateFrame("Button", nil, mainDialog, "UIPanelCloseButton")
         closeButton:SetSize(24, 24)
-        closeButton:SetPoint("TOPRIGHT", dialog, "TOPRIGHT", 4, 4)
-        closeButton:SetFrameLevel(dialog:GetFrameLevel() + 10)
-        closeButton:SetScript("OnClick", function() dialog:Hide() end)
+        closeButton:SetPoint("TOPRIGHT", mainDialog, "TOPRIGHT", 4, 4)
+        closeButton:SetFrameLevel(mainDialog:GetFrameLevel() + 10)
+        closeButton:SetScript("OnClick", function() mainDialog:Hide() end)
 
-        CreateSeparator(dialog, "OVERLAY", "TOPLEFT",    "TOPRIGHT",    -26)
-        CreateSeparator(dialog, "OVERLAY", "BOTTOMLEFT", "BOTTOMRIGHT",  40)
+        createSeparator(mainDialog, "OVERLAY", "TOPLEFT", "TOPRIGHT", -26)
+        createSeparator(mainDialog, "OVERLAY", "BOTTOMLEFT", "BOTTOMRIGHT", 40)
 
-        local scrollFrame = CreateFrame("ScrollFrame", nil, dialog, "UIPanelScrollFrameTemplate")
-        scrollFrame:SetPoint("TOPLEFT",     dialog, "TOPLEFT",      8,  -32)
-        scrollFrame:SetPoint("BOTTOMRIGHT", dialog, "BOTTOMRIGHT", -26,  46)
+        local dialogScrollFrame = CreateFrame("ScrollFrame", nil, mainDialog, "UIPanelScrollFrameTemplate")
+        dialogScrollFrame:SetPoint("TOPLEFT", mainDialog, "TOPLEFT", 8, -32)
+        dialogScrollFrame:SetPoint("BOTTOMRIGHT", mainDialog, "BOTTOMRIGHT", -26, 46)
 
-        local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-        scrollChild:SetWidth(scrollFrame:GetWidth())
-        scrollChild:SetHeight(1)
-        scrollFrame:SetScrollChild(scrollChild)
+        local dialogScrollChild = CreateFrame("Frame", nil, dialogScrollFrame)
+        dialogScrollChild:SetWidth(dialogScrollFrame:GetWidth())
+        dialogScrollChild:SetHeight(1)
+        dialogScrollFrame:SetScrollChild(dialogScrollChild)
 
-        dialog.scrollFrame = scrollFrame
-        dialog.scrollChild = scrollChild
+        mainDialog.scrollFrame = dialogScrollFrame
+        mainDialog.scrollChild = dialogScrollChild
 
-        local whisperAllButton = CreateActionButton(dialog, "Whisper All", 120, function()
+        local whisperAllButton = createActionButton(mainDialog, "Whisper All", 120, function()
             if #currentNames == 0 then return end
             ChatFrame_OpenChat("/whisperall ", DEFAULT_CHAT_FRAME)
         end)
-        whisperAllButton:SetPoint("BOTTOM", dialog, "BOTTOM", 0, 12)
+        whisperAllButton:SetPoint("BOTTOM", mainDialog, "BOTTOM", 0, 12)
 
-        namesDialog = dialog
+        namesDialog = mainDialog
     end
 
-    UpdateNamesDialog(names)
+    updateNamesDialog(playerNamesList)
     namesDialog:Show()
 end
 
--- Public interface consumed by Battleground.lua and Auction.lua
-CopyAllTheNames.ApplyClassicButtonStyle = ApplyClassicButtonStyle
-CopyAllTheNames.CreateActionButton      = CreateActionButton
+-- Expose UI generation routines and main dialog references publicly to allow other files to attach scraping hooks because logic is divided into feature modules
+
+CopyAllTheNames.applyClassicButtonStyle = applyClassicButtonStyle
+CopyAllTheNames.createActionButton = createActionButton
 
 CopyAllTheNames_NamesDialog = {
-    Show    = ShowNamesDialog,
-    Hide    = function() if namesDialog then namesDialog:Hide() end end,
-    Update  = UpdateNamesDialog,
+    Show = showNamesDialog,
+    Hide = function() if namesDialog then namesDialog:Hide() end end,
+    Update = updateNamesDialog,
     IsShown = function() return namesDialog and namesDialog:IsShown() end,
 }

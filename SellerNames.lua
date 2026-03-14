@@ -1,65 +1,77 @@
--- Auction house seller name collector
+-- Extract owner names from auction house search results to facilitate bulk communication because players often sell multiple items simultaneously
 
-local function CollectSellerNames()
+local function collectSellerNames()
     local itemBuyFrame = AuctionHouseFrame and AuctionHouseFrame.ItemBuyFrame
     if not itemBuyFrame then return {} end
 
-    local itemKey = itemBuyFrame.itemKey
-    if not itemKey then return {} end
+    local currentItemKey = itemBuyFrame.itemKey
+    if not currentItemKey then return {} end
 
-    local names      = {}
-    local foundNames = {}
+    local playerNamesList = {}
+    local foundNamesList = {}
 
-    for i = 1, C_AuctionHouse.GetNumItemSearchResults(itemKey) do
-        local info = C_AuctionHouse.GetItemSearchResultInfo(itemKey, i)
-        if info and info.owners then
-            for _, owner in ipairs(info.owners) do
-                if owner and owner ~= "" and not foundNames[owner] then
-                    foundNames[owner] = true
-                    names[#names + 1] = owner
+    for searchIndex = 1, C_AuctionHouse.GetNumItemSearchResults(currentItemKey) do
+        local resultInformation = C_AuctionHouse.GetItemSearchResultInfo(currentItemKey, searchIndex)
+
+        if resultInformation and resultInformation.owners then
+            for _, auctionOwner in ipairs(resultInformation.owners) do
+                if auctionOwner and auctionOwner ~= "" and not foundNamesList[auctionOwner] then
+                    foundNamesList[auctionOwner] = true
+                    playerNamesList[#playerNamesList + 1] = auctionOwner
                 end
             end
         end
     end
 
-    return names
+    return playerNamesList
 end
 
 local sellerNamesButton
 
-local function SetupAuctionHouse()
+-- Inject the seller collection button into the auction house interface to expose the feature because the default UI lacks native export capabilities
+
+local function setupAuctionHouse()
     if not AuctionHouseFrame or sellerNamesButton then return end
 
-    local btn = CreateFrame("Button", nil, AuctionHouseFrame, "UIPanelButtonTemplate")
-    btn:SetSize(120, 25)
-    btn:SetText("Player Names")
-    btn:SetPoint("RIGHT", AuctionHouseFrame.ItemBuyFrame.ItemList.RefreshFrame, "LEFT", -5, 0)
-    btn:SetFrameStrata("HIGH")
-    btn:Hide()
-    CopyAllTheNames.ApplyClassicButtonStyle(btn)
+    local playerNamesButton = CreateFrame("Button", nil, AuctionHouseFrame, "UIPanelButtonTemplate")
 
-    btn:SetScript("OnClick", function()
+    playerNamesButton:SetSize(120, 25)
+    playerNamesButton:SetText("Player Names")
+    playerNamesButton:SetPoint("RIGHT", AuctionHouseFrame.ItemBuyFrame.ItemList.RefreshFrame, "LEFT", -5, 0)
+    playerNamesButton:SetFrameStrata("HIGH")
+    playerNamesButton:Hide()
+
+    CopyAllTheNames.applyClassicButtonStyle(playerNamesButton)
+
+    playerNamesButton:SetScript("OnClick", function()
         if InCombatLockdown() then return end
+
         CopyAllTheNames_NamesDialog.Hide()
-        local names = CollectSellerNames()
-        if #names > 0 then
-            CopyAllTheNames_NamesDialog.Show(names)
+        local playerNamesList = collectSellerNames()
+
+        if #playerNamesList > 0 then
+            CopyAllTheNames_NamesDialog.Show(playerNamesList)
         end
     end)
 
-    sellerNamesButton = btn
+    sellerNamesButton = playerNamesButton
 
     local itemBuyFrame = AuctionHouseFrame.ItemBuyFrame
+
     if itemBuyFrame then
         itemBuyFrame:HookScript("OnShow", function() sellerNamesButton:Show() end)
         itemBuyFrame:HookScript("OnHide", function() sellerNamesButton:Hide() end)
     end
 end
 
-local frame = CreateFrame("Frame")
-frame:RegisterEvent("ADDON_LOADED")
-frame:SetScript("OnEvent", function(_, _, addon)
-    if addon == "Blizzard_AuctionHouseUI" then
-        C_Timer.After(0, SetupAuctionHouse)
+-- Wait for the auction house to load before applying modifications because Blizzard addons load dynamically on demand
+
+local eventListenerFrame = CreateFrame("Frame")
+
+eventListenerFrame:RegisterEvent("ADDON_LOADED")
+
+eventListenerFrame:SetScript("OnEvent", function(_, _, matchedAddon)
+    if matchedAddon == "Blizzard_AuctionHouseUI" then
+        C_Timer.After(0, setupAuctionHouse)
     end
 end)

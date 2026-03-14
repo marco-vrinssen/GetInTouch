@@ -1,109 +1,139 @@
--- Battleground scoreboard player list integration
+-- Integrate list button into the battleground scoreboard to parse and collect player names because writing them out manually is tedious
 
-local issecretvalue = issecretvalue or function() return false end
+local isSecretValueChecked = issecretvalue or function() return false end
 
-local pendingShow = false
+local isPendingShow = false
 
-local function CollectPlayerNames()
-    local names      = {}
-    local foundNames = {}
+-- Iterate through the battleground api to aggregate unique player names because the api doesn't offer a direct list of active combatants
 
-    for i = 1, GetNumBattlefieldScores() do
-        local info = C_PvP.GetScoreInfo(i)
-        if info
-        and info.name
-        and not issecretvalue(info.name)
-        and info.name ~= ""
+local function collectPlayerNames()
+    local playerNamesList = {}
+    local foundNamesList = {}
+
+    for eventIndex = 1, GetNumBattlefieldScores() do
+        local scoreInformation = C_PvP.GetScoreInfo(eventIndex)
+
+        if scoreInformation
+        and scoreInformation.name
+        and not isSecretValueChecked(scoreInformation.name)
+        and scoreInformation.name ~= ""
         then
-            local name = tostring(info.name)
-            if not foundNames[name] then
-                foundNames[name] = true
-                names[#names + 1] = name
+            local parsedName = tostring(scoreInformation.name)
+
+            if not foundNamesList[parsedName] then
+                foundNamesList[parsedName] = true
+                playerNamesList[#playerNamesList + 1] = parsedName
             end
         end
     end
 
-    return names
+    return playerNamesList
 end
 
-local function RefreshPlayerList()
+-- Fetch the latest match metrics from the api to refresh the open name frame because players may join or leave during battlegrounds
+
+local function refreshPlayerList()
     if not CopyAllTheNames_NamesDialog.IsShown() then return end
-    local names = CollectPlayerNames()
-    if #names > 0 then
-        CopyAllTheNames_NamesDialog.Update(names)
+
+    local playerNamesList = collectPlayerNames()
+
+    if #playerNamesList > 0 then
+        CopyAllTheNames_NamesDialog.Update(playerNamesList)
     end
 end
 
-local function ShowWhenReady()
-    local names = CollectPlayerNames()
-    if #names > 0 then
-        CopyAllTheNames_NamesDialog.Show(names)
+-- Attempt to render the collected list or defer execution until data arrives because querying the server has an asynchronous delay
+
+local function showWhenDataReady()
+    local playerNamesList = collectPlayerNames()
+
+    if #playerNamesList > 0 then
+        CopyAllTheNames_NamesDialog.Show(playerNamesList)
         return
     end
 
-    pendingShow = true
+    isPendingShow = true
     RequestBattlefieldScoreData()
 
     C_Timer.After(2.0, function()
-        if not pendingShow then return end
-        pendingShow = false
-        CopyAllTheNames_NamesDialog.Show(CollectPlayerNames())
+        if not isPendingShow then return end
+
+        isPendingShow = false
+        CopyAllTheNames_NamesDialog.Show(collectPlayerNames())
     end)
 end
 
-local function CreateNamesButton(panel)
-    if not panel or panel.namesBtn then return end
-    local content = panel.Content or panel.content
-    if not content then return end
+-- Attach a user trigger action button onto an existing match panel to invoke extraction because the default UI offers no export action
 
-    local btn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
-    btn:SetSize(120, 25)
-    btn:SetText("Player Names")
-    btn:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", -10, 10)
-    CopyAllTheNames.ApplyClassicButtonStyle(btn)
+local function createNamesButton(scoreboardPanel)
+    if not scoreboardPanel or scoreboardPanel.namesButtonTrigger then return end
 
-    btn:SetScript("OnClick", function()
+    local interactionContent = scoreboardPanel.Content or scoreboardPanel.content
+    if not interactionContent then return end
+
+    local interactionButton = CreateFrame("Button", nil, interactionContent, "UIPanelButtonTemplate")
+
+    interactionButton:SetSize(120, 25)
+    interactionButton:SetText("Player Names")
+    interactionButton:SetPoint("BOTTOMRIGHT", interactionContent, "BOTTOMRIGHT", -10, 10)
+
+    CopyAllTheNames.applyClassicButtonStyle(interactionButton)
+
+    interactionButton:SetScript("OnClick", function()
         if CopyAllTheNames_NamesDialog.IsShown() then
             CopyAllTheNames_NamesDialog.Hide()
             return
         end
-        ShowWhenReady()
+        showWhenDataReady()
     end)
 
-    -- Pre-fetch score data the moment the panel is shown so it is
-    -- warm before the user clicks the button
-    panel:HookScript("OnShow", function()
+    scoreboardPanel:HookScript("OnShow", function()
         RequestBattlefieldScoreData()
     end)
 
-    panel.namesBtn = btn
+    scoreboardPanel.namesButtonTrigger = interactionButton
 end
 
-local function SetupScoreboard()
-    if PVPMatchScoreboard then CreateNamesButton(PVPMatchScoreboard) end
-    if PVPMatchResults    then CreateNamesButton(PVPMatchResults) end
+-- Apply UI adaptations to all supported scoreboard variants to hook the player view because retail WoW switches panel types conditionally
+
+local function setupScoreboardHooks()
+    if PVPMatchScoreboard then createNamesButton(PVPMatchScoreboard) end
+    if PVPMatchResults then createNamesButton(PVPMatchResults) end
 end
 
-local frame = CreateFrame("Frame")
-frame:RegisterEvent("ADDON_LOADED")
-frame:RegisterEvent("UPDATE_BATTLEFIELD_SCORE")
-frame:SetScript("OnEvent", function(_, event, addon)
-    if event == "ADDON_LOADED" and addon == "Blizzard_PVPUI" then
-        SetupScoreboard()
+-- Intercept PvP phase transitions to fetch match numbers ahead of rendering because preloading data prevents empty dialog lists
+
+local eventListenerFrame = CreateFrame("Frame")
+
+eventListenerFrame:RegisterEvent("ADDON_LOADED")
+eventListenerFrame:RegisterEvent("UPDATE_BATTLEFIELD_SCORE")
+eventListenerFrame:RegisterEvent("PVP_MATCH_COMPLETE")
+
+eventListenerFrame:SetScript("OnEvent", function(_, dispatchedEvent, matchedAddon)
+    if dispatchedEvent == "ADDON_LOADED" and matchedAddon == "Blizzard_PVPUI" then
+        setupScoreboardHooks()
+
         if PVPMatchScoreboard then
-            PVPMatchScoreboard:HookScript("OnShow", function() CreateNamesButton(PVPMatchScoreboard) end)
+            PVPMatchScoreboard:HookScript("OnShow", function() createNamesButton(PVPMatchScoreboard) end)
         end
+
         if PVPMatchResults then
-            PVPMatchResults:HookScript("OnShow", function() CreateNamesButton(PVPMatchResults) end)
+            PVPMatchResults:HookScript("OnShow", function() createNamesButton(PVPMatchResults) end)
         end
-    elseif event == "UPDATE_BATTLEFIELD_SCORE" then
-        if pendingShow then
-            pendingShow = false
-            CopyAllTheNames_NamesDialog.Show(CollectPlayerNames())
+
+    elseif dispatchedEvent == "PVP_MATCH_COMPLETE" then
+        RequestBattlefieldScoreData()
+
+    elseif dispatchedEvent == "UPDATE_BATTLEFIELD_SCORE" then
+        if isPendingShow then
+            isPendingShow = false
+            CopyAllTheNames_NamesDialog.Show(collectPlayerNames())
         else
-            RefreshPlayerList()
+            refreshPlayerList()
         end
     end
 end)
 
-SetupScoreboard()
+-- Execute the binding setup preemptively to capture immediately available structures because load order may outpace our frame initialization
+
+setupScoreboardHooks()

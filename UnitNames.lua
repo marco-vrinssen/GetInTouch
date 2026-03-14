@@ -1,11 +1,11 @@
--- Add copy full name option to right-click context menus
+-- Inject a copy full name action into the native right-click context menus because manual typing is prone to spelling errors
 
-local finderTags = {
+local acceptableFinderTags = {
     MENU_LFG_FRAME_SEARCH_ENTRY = true,
     MENU_LFG_FRAME_MEMBER_APPLY = true,
 }
 
-local playerTypes = {
+local acceptablePlayerTypes = {
     PLAYER = true, PARTY = true, RAID_PLAYER = true,
     FRIEND = true, FRIEND_OFFLINE = true, FRIEND_ONLINE = true,
     BN_FRIEND = true, SELF = true, OTHER_PLAYER = true,
@@ -15,84 +15,138 @@ local playerTypes = {
     PVP_SCOREBOARD = true,
 }
 
-local function SplitNameRealm(full)
-    if not full then return nil, nil end
-    local name, realm = full:match("^([^-]+)-(.+)$")
-    return name or full, realm or GetRealmName()
+-- Separate a combined string into name and realm components to normalize formats because WoW passes mixed representations via the UI API
+
+local function splitNameRealm(fullIdentifierString)
+    if not fullIdentifierString then return nil, nil end
+
+    local extractedName, extractedRealm = fullIdentifierString:match("^([^-]+)-(.+)$")
+
+    return extractedName or fullIdentifierString, extractedRealm or GetRealmName()
 end
 
-local function ResolveFinder(owner)
-    if not owner then return nil, nil end
-    if owner.resultID and C_LFGList then
-        local result = C_LFGList.GetSearchResultInfo(owner.resultID)
-        if result and result.leaderName then return SplitNameRealm(result.leaderName) end
-    end
-    if owner.memberIdx then
-        local parent = owner:GetParent()
-        if parent and parent.applicantID and C_LFGList then
-            local name = C_LFGList.GetApplicantMemberInfo(parent.applicantID, owner.memberIdx)
-            if name then return SplitNameRealm(name) end
+-- Query the looking for group API to find a leader or applicant identity because group finder context menus don't directly supply standard names
+
+local function resolveFinderIdentity(menuOwnerTarget)
+    if not menuOwnerTarget then return nil, nil end
+
+    if menuOwnerTarget.resultID and C_LFGList then
+        local searchResultInformation = C_LFGList.GetSearchResultInfo(menuOwnerTarget.resultID)
+
+        if searchResultInformation and searchResultInformation.leaderName then
+            return splitNameRealm(searchResultInformation.leaderName)
         end
     end
+
+    if menuOwnerTarget.memberIdx then
+        local parentFrame = menuOwnerTarget:GetParent()
+
+        if parentFrame and parentFrame.applicantID and C_LFGList then
+            local applicantName = C_LFGList.GetApplicantMemberInfo(parentFrame.applicantID, menuOwnerTarget.memberIdx)
+
+            if applicantName then
+                return splitNameRealm(applicantName)
+            end
+        end
+    end
+
     return nil, nil
 end
 
-local function ResolvePlayer(owner, root, context)
-    if not context then
-        if root and root.tag and finderTags[root.tag] then return ResolveFinder(owner) end
+-- Interrogate the active context source to extract a uniform player identifier because different panels supply names through completely entirely different properties
+
+local function resolvePlayerIdentity(menuOwnerTarget, menuRootComponent, contextData)
+    if not contextData then
+        if menuRootComponent and menuRootComponent.tag and acceptableFinderTags[menuRootComponent.tag] then
+            return resolveFinderIdentity(menuOwnerTarget)
+        end
         return nil, nil
     end
-    if context.name and context.server then return context.name, context.server end
-    if context.which == "PVP_SCOREBOARD" and context.unit and C_PvP then
-        local scoreInfo = C_PvP.GetScoreInfoByPlayerGuid(context.unit)
-        if scoreInfo and scoreInfo.name then return SplitNameRealm(scoreInfo.name) end
+
+    if contextData.name and contextData.server then
+        return contextData.name, contextData.server
     end
-    if context.unit and UnitExists(context.unit) then
-        local unitName = UnitName(context.unit)
-        if unitName then
-            local playerName, realmName = SplitNameRealm(unitName)
-            return playerName, context.server or realmName
+
+    if contextData.which == "PVP_SCOREBOARD" and contextData.unit and C_PvP then
+        local scoreInformation = C_PvP.GetScoreInfoByPlayerGuid(contextData.unit)
+
+        if scoreInformation and scoreInformation.name then
+            return splitNameRealm(scoreInformation.name)
         end
     end
-    if context.accountInfo and context.accountInfo.gameAccountInfo then
-        local gameAccount = context.accountInfo.gameAccountInfo
-        return gameAccount.characterName, gameAccount.realmName
+
+    if contextData.unit and UnitExists(contextData.unit) then
+        local targetUnitName = UnitName(contextData.unit)
+
+        if targetUnitName then
+            local extractedName, extractedRealm = splitNameRealm(targetUnitName)
+
+            return extractedName, contextData.server or extractedRealm
+        end
     end
-    if context.name then return SplitNameRealm(context.name) end
-    if context.friendsList and C_FriendList then
-        local friendInfo = C_FriendList.GetFriendInfoByIndex(context.friendsList)
-        if friendInfo and friendInfo.name then return SplitNameRealm(friendInfo.name) end
+
+    if contextData.accountInfo and contextData.accountInfo.gameAccountInfo then
+        local gameAccountStructure = contextData.accountInfo.gameAccountInfo
+
+        return gameAccountStructure.characterName, gameAccountStructure.realmName
     end
-    if context.chatTarget then return SplitNameRealm(context.chatTarget) end
+
+    if contextData.name then
+        return splitNameRealm(contextData.name)
+    end
+
+    if contextData.friendsList and C_FriendList then
+        local storedFriendInformation = C_FriendList.GetFriendInfoByIndex(contextData.friendsList)
+
+        if storedFriendInformation and storedFriendInformation.name then
+            return splitNameRealm(storedFriendInformation.name)
+        end
+    end
+
+    if contextData.chatTarget then
+        return splitNameRealm(contextData.chatTarget)
+    end
+
     return nil, nil
 end
 
-local processed = {}
+local processedMenuInjections = {}
 
-local function AddCopyButton(owner, root, context)
+-- Attach the supplemental copy action to the generated dropdown assuming it is a valid player because non-player entities should not have a copy option
+
+local function addCopyButton(menuOwnerTarget, menuRootComponent, contextData)
     if InCombatLockdown() then return end
-    if not context then
-        if not (root and root.tag and finderTags[root.tag]) then return end
+
+    if not contextData then
+        if not (menuRootComponent and menuRootComponent.tag and acceptableFinderTags[menuRootComponent.tag]) then return end
     else
-        if not (context.clubId or (context.which and playerTypes[context.which])) then return end
+        if not (contextData.clubId or (contextData.which and acceptablePlayerTypes[contextData.which])) then return end
     end
-    local name, realm = ResolvePlayer(owner, root, context)
-    if not (name and realm and root and root.CreateButton) then return end
-    name  = tostring(name)
-    realm = tostring(realm)
-    local key = tostring(root) .. name .. realm
-    if processed[key] then return end
-    processed[key] = true
-    C_Timer.After(0.5, function() processed[key] = nil end)
-    if root.CreateDivider then root:CreateDivider() end
-    root:CreateButton("Copy Full Name", function()
+
+    local extractedName, extractedRealm = resolvePlayerIdentity(menuOwnerTarget, menuRootComponent, contextData)
+
+    if not (extractedName and extractedRealm and menuRootComponent and menuRootComponent.CreateButton) then return end
+
+    extractedName = tostring(extractedName)
+    extractedRealm = tostring(extractedRealm)
+
+    local deduplicationKey = tostring(menuRootComponent) .. extractedName .. extractedRealm
+
+    if processedMenuInjections[deduplicationKey] then return end
+
+    processedMenuInjections[deduplicationKey] = true
+    C_Timer.After(0.5, function() processedMenuInjections[deduplicationKey] = nil end)
+
+    if menuRootComponent.CreateDivider then menuRootComponent:CreateDivider() end
+
+    menuRootComponent:CreateButton("Copy Full Name", function()
         if not InCombatLockdown() then
-            CopyAllTheNames.OpenCopyPopup(name .. "-" .. realm)
+            CopyAllTheNames.openCopyPopup(extractedName .. "-" .. extractedRealm)
         end
     end)
 end
 
-local menuTags = {
+local supportedMenuTags = {
     "MENU_LFG_FRAME_SEARCH_ENTRY", "MENU_LFG_FRAME_MEMBER_APPLY",
     "MENU_UNIT_PLAYER", "MENU_UNIT_PARTY", "MENU_UNIT_RAID_PLAYER",
     "MENU_UNIT_FRIEND", "MENU_UNIT_FRIEND_OFFLINE", "MENU_UNIT_FRIEND_ONLINE",
@@ -104,24 +158,40 @@ local menuTags = {
     "MENU_BATTLEGROUND_SCOREBOARD", "MENU_CHAT_LOG_LINK", "MENU_CHAT_LOG_FRAME",
 }
 
-local function RegisterMenus()
+-- Hook the menu generation lifecycle for all mapped tags to intercept construction because WoW context menus are generated dynamically per interaction
+
+local function registerMenuHooks()
     if not Menu or not Menu.ModifyMenu then return false end
-    for _, tag in ipairs(menuTags) do
-        Menu.ModifyMenu(tag, AddCopyButton)
+
+    for _, validMenuTag in ipairs(supportedMenuTags) do
+        Menu.ModifyMenu(validMenuTag, addCopyButton)
     end
+
     return true
 end
 
-if not RegisterMenus() then
-    local attempts = 0
-    C_Timer.NewTicker(0.5, function(ticker)
-        attempts = attempts + 1
-        if RegisterMenus() or attempts >= 10 then ticker:Cancel() end
+-- Ensure hooks apply sequentially even if Menu isn't immediately ready because some addons or layouts load context menus lazily
+
+if not registerMenuHooks() then
+    local retryAttempts = 0
+
+    C_Timer.NewTicker(0.5, function(tickerFrame)
+        retryAttempts = retryAttempts + 1
+
+        if registerMenuHooks() or retryAttempts >= 10 then
+            tickerFrame:Cancel()
+        end
     end)
 end
 
-local contextMenuFrame = CreateFrame("Frame")
-contextMenuFrame:RegisterEvent("ADDON_LOADED")
-contextMenuFrame:SetScript("OnEvent", function(_, _, addon)
-    if addon == "Blizzard_PVPUI" then RegisterMenus() end
+-- Refresh hooks when PVP UI modules load to catch delayed battleground scoreboard generation because they bypass standard initial loading
+
+local eventListenerFrame = CreateFrame("Frame")
+
+eventListenerFrame:RegisterEvent("ADDON_LOADED")
+
+eventListenerFrame:SetScript("OnEvent", function(_, _, matchedAddon)
+    if matchedAddon == "Blizzard_PVPUI" then
+        registerMenuHooks()
+    end
 end)

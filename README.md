@@ -1,6 +1,6 @@
 # CopyAllTheNames
 
-WoW addon to copy player names from right-click context menus, PvP scoreboards, auction house seller lists, and mouseover text, with bulk whisper and invite support.
+Minimal WoW addon to copy player names from right-click context menus, PvP scoreboards, auction house seller lists, and mouseover text, with bulk whisper and invite support.
 
 ## Features
 
