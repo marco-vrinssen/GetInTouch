@@ -1,4 +1,4 @@
--- Auction house seller name collector with bulk-copy button
+-- Auction house seller name collector
 
 local function CollectSellerNames()
     local itemBuyFrame = AuctionHouseFrame and AuctionHouseFrame.ItemBuyFrame
@@ -31,11 +31,12 @@ local function SetupAuctionHouse()
     if not AuctionHouseFrame or sellerNamesButton then return end
 
     local btn = CreateFrame("Button", nil, AuctionHouseFrame, "UIPanelButtonTemplate")
-    btn:SetSize(140, 22)
-    btn:SetText("Copy Seller Names")
+    btn:SetSize(120, 25)
+    btn:SetText("Player Names")
     btn:SetPoint("RIGHT", AuctionHouseFrame.ItemBuyFrame.ItemList.RefreshFrame, "LEFT", -5, 0)
     btn:SetFrameStrata("HIGH")
     btn:Hide()
+    CopyAllTheNames.ApplyClassicButtonStyle(btn)
 
     btn:SetScript("OnClick", function()
         if InCombatLockdown() then return end
