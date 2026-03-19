@@ -94,7 +94,7 @@ end
 local function createNamesButton(scoreboardPanel)
     if not scoreboardPanel or scoreboardPanel.namesButtonTrigger then return end
 
-    local interactionContent = scoreboardPanel.Content or scoreboardPanel.content
+    local interactionContent = scoreboardPanel.Content or scoreboardPanel.content or scoreboardPanel
     if not interactionContent then return end
 
     local interactionButton = CopyAllTheNames.createActionButton(interactionContent, "Player Names", 120, function()
