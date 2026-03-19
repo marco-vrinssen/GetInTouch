@@ -33,17 +33,7 @@ local sellerNamesButton
 local function setupAuctionHouse()
     if not AuctionHouseFrame or sellerNamesButton then return end
 
-    local playerNamesButton = CreateFrame("Button", nil, AuctionHouseFrame, "UIPanelButtonTemplate")
-
-    playerNamesButton:SetSize(120, 25)
-    playerNamesButton:SetText("Player Names")
-    playerNamesButton:SetPoint("RIGHT", AuctionHouseFrame.ItemBuyFrame.ItemList.RefreshFrame, "LEFT", -5, 0)
-    playerNamesButton:SetFrameStrata("HIGH")
-    playerNamesButton:Hide()
-
-    CopyAllTheNames.applyClassicButtonStyle(playerNamesButton)
-
-    playerNamesButton:SetScript("OnClick", function()
+    local playerNamesButton = CopyAllTheNames.createActionButton(AuctionHouseFrame, "Player Names", 120, function()
         if InCombatLockdown() then return end
 
         CopyAllTheNames_NamesDialog.Hide()
@@ -52,7 +42,11 @@ local function setupAuctionHouse()
         if #playerNamesList > 0 then
             CopyAllTheNames_NamesDialog.Show(playerNamesList)
         end
-    end)
+    end, 25)
+
+    playerNamesButton:SetPoint("RIGHT", AuctionHouseFrame.ItemBuyFrame.ItemList.RefreshFrame, "LEFT", -5, 0)
+    playerNamesButton:SetFrameStrata("HIGH")
+    playerNamesButton:Hide()
 
     sellerNamesButton = playerNamesButton
 

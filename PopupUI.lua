@@ -53,10 +53,10 @@ end
 
 -- Create a standard action button with the classic style applied to simplify UI creation because writing this logic inline clutters layouts
 
-local function createActionButton(parentFrame, labelText, buttonWidth, clickHandler)
+local function createActionButton(parentFrame, labelText, buttonWidth, clickHandler, buttonHeight)
     local buttonFrame = CreateFrame("Button", nil, parentFrame, "UIPanelButtonTemplate")
 
-    buttonFrame:SetSize(buttonWidth, 22)
+    buttonFrame:SetSize(buttonWidth, buttonHeight or 22)
     buttonFrame:SetText(labelText)
     buttonFrame:SetScript("OnClick", clickHandler)
 
@@ -147,6 +147,22 @@ function CopyAllTheNames.openCopyPopup(playerName)
     copyPopup:Show()
 end
 
+-- Check whether a battleground is still in progress to prevent whispering tainted names because score data is secret during active matches
+
+local function isMatchStillActive()
+    local isInBattlefield = C_PvP and C_PvP.IsBattleground and C_PvP.IsBattleground()
+
+    if not isInBattlefield then return false end
+
+    return GetBattlefieldWinner() == nil
+end
+
+-- Warn the user to wait until the match ends to prevent taint errors because Blizzard restricts name access during active PvP
+
+local function printMatchActiveWarning()
+    print("|cffff9900CopyAllTheNames:|r Match is still active. Wait until it ends to whisper players.")
+end
+
 -- Define slash command to whisper all collected names to support bulk communication because manually whispering list members is slow
 
 SLASH_COPYALLTHENAMES_WHISPERALL1 = "/whisperall"
@@ -156,13 +172,22 @@ SlashCmdList["COPYALLTHENAMES_WHISPERALL"] = function(chatMessage)
         return
     end
 
+    if isMatchStillActive() then
+        printMatchActiveWarning()
+        return
+    end
+
     if #currentNames == 0 then
         print("|cffff9900CopyAllTheNames:|r No players in the current list.")
         return
     end
 
-    for _, targetPlayerName in ipairs(currentNames) do
-        pcall(SendChatMessage, chatMessage, "WHISPER", nil, targetPlayerName)
+    -- Defer each whisper into a separate timer callback to break the taint chain because synchronous calls taint Blizzard's chat history tables
+
+    for nameIndex, targetPlayerName in ipairs(currentNames) do
+        C_Timer.After(nameIndex * 0.1, function()
+            SendChatMessage(chatMessage, "WHISPER", nil, targetPlayerName)
+        end)
     end
 end
 
@@ -170,8 +195,20 @@ end
 
 local actionDefinitions = {
     { label = "Copy", handler = function(targetName) CopyAllTheNames.openCopyPopup(targetName) end },
-    { label = "Whisper", handler = function(targetName) pcall(ChatFrame_OpenChat, "/w " .. targetName .. " ", DEFAULT_CHAT_FRAME) end },
-    { label = "Invite", handler = function(targetName) pcall(C_PartyInfo.ConfirmInviteUnit, targetName) end, isCombatLocked = true },
+    { label = "Whisper", handler = function(targetName)
+        if isMatchStillActive() then
+            printMatchActiveWarning()
+            return
+        end
+        pcall(ChatFrame_OpenChat, "/w " .. targetName .. " ", DEFAULT_CHAT_FRAME)
+    end },
+    { label = "Invite", handler = function(targetName)
+        if isMatchStillActive() then
+            printMatchActiveWarning()
+            return
+        end
+        pcall(C_PartyInfo.ConfirmInviteUnit, targetName)
+    end, isCombatLocked = true },
 }
 
 -- Create a new reusable list row containing a name and interaction buttons to display entries because the dialog needs to handle variable lengths
