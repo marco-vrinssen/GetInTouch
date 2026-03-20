@@ -82,14 +82,14 @@ end
 
 local buttonPadding = 20
 local rowButtonWidth = (function()
-    local probeButton = CreateFrame("Button", nil, UIParent, "UIPanelButtonTemplate")
-    probeButton:SetText("Whisper")
+    local probe = UIParent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    probe:SetText("Whisper")
 
-    local buttonWidth = probeButton:GetFontString():GetStringWidth() + buttonPadding
+    local width = probe:GetStringWidth() + buttonPadding
 
-    probeButton:Hide()
+    probe:Hide()
 
-    return math.max(buttonWidth, 70)
+    return math.max(width, 70)
 end)()
 
 -- Open a text input dialog framing the provided string to facilitate copying because the user cannot highlight standard font strings
