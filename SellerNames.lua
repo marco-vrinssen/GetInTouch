@@ -33,7 +33,7 @@ local sellerNamesButton
 local function setupAuctionHouse()
     if not AuctionHouseFrame or sellerNamesButton then return end
 
-    local playerNamesButton = CopyAllTheNames.createActionButton(AuctionHouseFrame, "Player Names", 120, function()
+    local playerNamesButton = CopyAllTheNames.createActionButton(AuctionHouseFrame, "Contact Players", 120, function()
         if InCombatLockdown() then return end
 
         CopyAllTheNames_NamesDialog.Hide()

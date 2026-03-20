@@ -200,7 +200,7 @@ local actionDefinitions = {
             printMatchActiveWarning()
             return
         end
-        pcall(ChatFrame_OpenChat, "/w " .. targetName .. " ", DEFAULT_CHAT_FRAME)
+        ChatFrame_OpenChat("/w " .. targetName .. " ", DEFAULT_CHAT_FRAME)
     end },
     { label = "Invite", handler = function(targetName)
         if isMatchStillActive() then
