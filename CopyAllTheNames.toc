@@ -4,8 +4,8 @@
 ## Author: MIYANKO
 ## Version: 1.0.0
 
-PlainText.lua
-PopupUI.lua
-ScoreboardNames.lua
+CopyString.lua
+PopupList.lua
+PvPNames.lua
 SellerNames.lua
 UnitNames.lua
