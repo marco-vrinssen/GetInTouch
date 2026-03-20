@@ -95,7 +95,6 @@ eventListenerFrame:RegisterEvent("UPDATE_BATTLEFIELD_SCORE")
 eventListenerFrame:SetScript("OnEvent", function(_, dispatchedEvent, matchedAddon)
     if dispatchedEvent == "ADDON_LOADED" and matchedAddon == "Blizzard_PVPUI" then
         createNamesButton()
-        PVPMatchResults:HookScript("OnShow", function() createNamesButton() end)
 
     elseif dispatchedEvent == "UPDATE_BATTLEFIELD_SCORE" then
         if isPendingShow then
@@ -110,6 +109,3 @@ eventListenerFrame:SetScript("OnEvent", function(_, dispatchedEvent, matchedAddo
     end
 end)
 
--- Execute the binding setup preemptively to capture immediately available structures because load order may outpace our frame initialization
-
-createNamesButton()
