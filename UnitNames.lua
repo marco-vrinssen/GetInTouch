@@ -1,11 +1,9 @@
 -- Inject a copy full name action into the native right-click context menus because manual typing is prone to spelling errors
 
-
 local acceptableFinderTags = {
     MENU_LFG_FRAME_SEARCH_ENTRY = true,
     MENU_LFG_FRAME_MEMBER_APPLY = true,
 }
-
 
 local acceptablePlayerTypes = {
     PLAYER = true, PARTY = true, RAID_PLAYER = true,
@@ -17,9 +15,7 @@ local acceptablePlayerTypes = {
     PVP_SCOREBOARD = true,
 }
 
-
 -- Separate a combined string into name and realm components to normalize formats because WoW passes mixed representations via the UI API
-
 
 local function splitNameRealm(fullIdentifierString)
     if not fullIdentifierString then return nil, nil end
@@ -29,9 +25,7 @@ local function splitNameRealm(fullIdentifierString)
     return extractedName or fullIdentifierString, extractedRealm or GetRealmName()
 end
 
-
 -- Query the looking for group API to find a leader or applicant identity because group finder context menus don't directly supply standard names
-
 
 local function resolveFinderIdentity(menuOwnerTarget)
     if not menuOwnerTarget then return nil, nil end
@@ -59,9 +53,7 @@ local function resolveFinderIdentity(menuOwnerTarget)
     return nil, nil
 end
 
-
--- Interrogate the active context source to extract a uniform player identifier because different panels supply names through completely entirely different properties
-
+-- Interrogate the active context source to extract a uniform player identifier because different panels supply names through completely different properties
 
 local function resolvePlayerIdentity(menuOwnerTarget, menuRootComponent, contextData)
     if not contextData then
@@ -123,12 +115,9 @@ local function resolvePlayerIdentity(menuOwnerTarget, menuRootComponent, context
     return nil, nil
 end
 
-
 local processedMenuInjections = {}
 
-
 -- Attach the supplemental copy action to the generated dropdown assuming it is a valid player because non-player entities should not have a copy option
-
 
 local function addCopyButton(menuOwnerTarget, menuRootComponent, contextData)
     if InCombatLockdown() then return end
@@ -162,7 +151,6 @@ local function addCopyButton(menuOwnerTarget, menuRootComponent, contextData)
     end)
 end
 
-
 local supportedMenuTags = {
     "MENU_LFG_FRAME_SEARCH_ENTRY", "MENU_LFG_FRAME_MEMBER_APPLY",
     "MENU_UNIT_PLAYER", "MENU_UNIT_PARTY", "MENU_UNIT_RAID_PLAYER",
@@ -175,9 +163,7 @@ local supportedMenuTags = {
     "MENU_BATTLEGROUND_SCOREBOARD", "MENU_CHAT_LOG_LINK", "MENU_CHAT_LOG_FRAME",
 }
 
-
 -- Hook the menu generation lifecycle for all mapped tags to intercept construction because WoW context menus are generated dynamically per interaction
-
 
 local function registerMenuHooks()
     if not Menu or not Menu.ModifyMenu then return false end
@@ -189,9 +175,7 @@ local function registerMenuHooks()
     return true
 end
 
-
 -- Ensure hooks apply sequentially even if Menu isn't immediately ready because some addons or layouts load context menus lazily
-
 
 if not registerMenuHooks() then
     local retryAttempts = 0
@@ -205,9 +189,7 @@ if not registerMenuHooks() then
     end)
 end
 
-
 -- Refresh hooks when PVP UI modules load to catch delayed battleground scoreboard generation because they bypass standard initial loading
-
 
 local eventListenerFrame = CreateFrame("Frame")
 
