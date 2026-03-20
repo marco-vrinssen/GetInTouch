@@ -1,5 +1,7 @@
 -- Retrieve text from under the mouse cursor to allow copying unselectable strings because default WoW frames do not support text selection
 
+-- Notify the user about the slash command on login because the feature is not surfaced anywhere in the UI
+
 local introFrame = CreateFrame("Frame")
 introFrame:RegisterEvent("PLAYER_LOGIN")
 introFrame:SetScript("OnEvent", function()
@@ -7,7 +9,7 @@ introFrame:SetScript("OnEvent", function()
 end)
 
 local function collectRegionText(frame, texts)
-    for _, region in next, { frame:GetRegions() } do
+    for _, region in ipairs({ frame:GetRegions() }) do
         if region.GetText then
             local ok, text = pcall(region.GetText, region)
             if ok and text and text ~= "" then
