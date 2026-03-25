@@ -3,6 +3,7 @@
 ## Notes: Copy player names from context menus, PvP scoreboard, auction house sellers, and mouseover text
 ## Author: MIYANKO
 ## Version: 1.0.0
+## IconTexture: 3163627
 
 CopyString.lua
 PopupList.lua
