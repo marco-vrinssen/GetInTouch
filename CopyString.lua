@@ -1,7 +1,6 @@
 -- Retrieve text from under the mouse cursor to allow copying unselectable strings because default WoW frames do not support text selection
 
 -- Notify the user about the slash command on login because the feature is not surfaced anywhere in the UI
-
 local introFrame = CreateFrame("Frame")
 introFrame:RegisterEvent("PLAYER_LOGIN")
 introFrame:SetScript("OnEvent", function()
@@ -40,7 +39,6 @@ local function getMouseoverText()
 end
 
 -- Bind the copy text slash command to open the copy popup dialog because users need a quick way to capture tooltips or frames via macro
-
 SLASH_COPYALLTHENAMES_COPYTEXT1 = "/ct"
 SlashCmdList["COPYALLTHENAMES_COPYTEXT"] = function()
     local text = getMouseoverText()

@@ -3,7 +3,6 @@
 local isPendingShow = false
 
 -- Iterate through the battleground api to aggregate unique player names
-
 local function collectPlayerNames()
     local playerNamesList = {}
     local foundNamesList = {}
@@ -28,7 +27,6 @@ local function collectPlayerNames()
 end
 
 -- Fetch the latest match metrics from the api to refresh the open name frame
-
 local function refreshPlayerList()
     if not CopyAllTheNames_NamesDialog.IsShown() then return end
 
@@ -40,7 +38,6 @@ local function refreshPlayerList()
 end
 
 -- Attempt to render the collected list or defer execution until data arrives because querying the server has an asynchronous delay
-
 local function showWhenDataReady()
     local playerNamesList = collectPlayerNames()
 
@@ -64,7 +61,6 @@ local function showWhenDataReady()
 end
 
 -- Attach a user trigger action button onto the match results panel to invoke extraction because the default UI offers no export action
-
 local function createNamesButton()
     if not PVPMatchResults or PVPMatchResults.namesButtonTrigger then return end
 
@@ -86,12 +82,9 @@ local function createNamesButton()
 end
 
 -- Listen for score data updates to fulfil pending show requests and refresh the open dialog
-
 local eventListenerFrame = CreateFrame("Frame")
-
 eventListenerFrame:RegisterEvent("ADDON_LOADED")
 eventListenerFrame:RegisterEvent("UPDATE_BATTLEFIELD_SCORE")
-
 eventListenerFrame:SetScript("OnEvent", function(_, dispatchedEvent, matchedAddon)
     if dispatchedEvent == "ADDON_LOADED" and matchedAddon == "Blizzard_PVPUI" then
         createNamesButton()
@@ -108,4 +101,3 @@ eventListenerFrame:SetScript("OnEvent", function(_, dispatchedEvent, matchedAddo
         end
     end
 end)
-

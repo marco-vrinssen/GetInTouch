@@ -29,7 +29,6 @@ end
 local sellerNamesButton
 
 -- Inject the seller collection button into the auction house interface to expose the feature because the default UI lacks native export capabilities
-
 local function setupAuctionHouse()
     if not AuctionHouseFrame or sellerNamesButton then return end
 
@@ -59,11 +58,8 @@ local function setupAuctionHouse()
 end
 
 -- Wait for the auction house to load before applying modifications because Blizzard addons load dynamically on demand
-
 local eventListenerFrame = CreateFrame("Frame")
-
 eventListenerFrame:RegisterEvent("ADDON_LOADED")
-
 eventListenerFrame:SetScript("OnEvent", function(_, _, matchedAddon)
     if matchedAddon == "Blizzard_AuctionHouseUI" then
         C_Timer.After(0, setupAuctionHouse)

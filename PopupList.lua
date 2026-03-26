@@ -3,18 +3,15 @@
 CopyAllTheNames = CopyAllTheNames or {}
 
 -- Declare local variables for UI components and row pooling to manage state because frames should be reused avoiding memory leaks
-
 local namesDialog
 local rowPool = {}
 local copyPopup
 local currentNames = {}
 
 -- Define consistent row height for the scrollable list to calculate offsets because dynamically sizing rows is inefficient
-
 local rowHeight = 34
 
 -- Define backdrop configuration for tooltips and dialogs to ensure consistent styling because default frame borders look outdated
-
 local tooltipBackdrop = {
     bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -25,7 +22,6 @@ local tooltipBackdrop = {
 }
 
 -- Apply the dark tooltip style to a given frame to match modern UI aesthetics because standard dialog backgrounds are too bright
-
 local function applyTooltipStyle(frame)
     frame:SetBackdrop(tooltipBackdrop)
     frame:SetBackdropColor(0.06, 0.06, 0.06, 0.97)
@@ -33,7 +29,6 @@ local function applyTooltipStyle(frame)
 end
 
 -- Force button textures to use the classic styling atlas to maintain visual coherence because the UI mixes old and new widget styles
-
 local function applyClassicButtonStyle(buttonFrame)
     local normalTexture = buttonFrame:GetNormalTexture()
     local pushedTexture = buttonFrame:GetPushedTexture()
@@ -52,7 +47,6 @@ local function applyClassicButtonStyle(buttonFrame)
 end
 
 -- Create a standard action button with the classic style applied to simplify UI creation because writing this logic inline clutters layouts
-
 local function createActionButton(parentFrame, labelText, buttonWidth, clickHandler, buttonHeight)
     local buttonFrame = CreateFrame("Button", nil, parentFrame, "UIPanelButtonTemplate")
 
@@ -66,7 +60,6 @@ local function createActionButton(parentFrame, labelText, buttonWidth, clickHand
 end
 
 -- Create a subtle horizontal line texture to divide sections visually because floating elements without borders lack grouping
-
 local function createSeparator(parentFrame, textureLayer, anchorFrom, anchorTo, verticalOffset)
     local separatorLine = parentFrame:CreateTexture(nil, textureLayer or "OVERLAY")
 
@@ -79,7 +72,6 @@ local function createSeparator(parentFrame, textureLayer, anchorFrom, anchorTo, 
 end
 
 -- Measure the width of the longest action button label to size all row buttons uniformly because misaligned interface buttons look unprofessional
-
 local buttonPadding = 20
 local rowButtonWidth = (function()
     local probe = UIParent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -93,7 +85,6 @@ local rowButtonWidth = (function()
 end)()
 
 -- Open a text input dialog framing the provided string to facilitate copying because the user cannot highlight standard font strings
-
 function CopyAllTheNames.openCopyPopup(playerName)
     if not copyPopup then
         copyPopup = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
@@ -148,7 +139,6 @@ function CopyAllTheNames.openCopyPopup(playerName)
 end
 
 -- Check whether a battleground is still in progress to prevent whispering tainted names because score data is secret during active matches
-
 local function isMatchStillActive()
     local isInBattlefield = C_PvP and C_PvP.IsBattleground and C_PvP.IsBattleground()
 
@@ -158,13 +148,11 @@ local function isMatchStillActive()
 end
 
 -- Warn the user to wait until the match ends to prevent taint errors because Blizzard restricts name access during active PvP
-
 local function printMatchActiveWarning()
     print("|cffff9900CopyAllTheNames:|r Match is still active. Wait until it ends to whisper players.")
 end
 
 -- Define slash command to whisper all collected names to support bulk communication because manually whispering list members is slow
-
 SLASH_COPYALLTHENAMES_WHISPERALL1 = "/whisperall"
 SlashCmdList["COPYALLTHENAMES_WHISPERALL"] = function(chatMessage)
     if not chatMessage or chatMessage == "" then
@@ -183,7 +171,6 @@ SlashCmdList["COPYALLTHENAMES_WHISPERALL"] = function(chatMessage)
     end
 
     -- Defer each whisper into a separate timer callback to break the taint chain because synchronous calls taint Blizzard's chat history tables
-
     for nameIndex, targetPlayerName in ipairs(currentNames) do
         C_Timer.After(nameIndex * 0.1, function()
             SendChatMessage(chatMessage, "WHISPER", nil, targetPlayerName)
@@ -192,7 +179,6 @@ SlashCmdList["COPYALLTHENAMES_WHISPERALL"] = function(chatMessage)
 end
 
 -- Store generic handlers for list interaction buttons to populate row actions dynamically because duplicating button configuration code is error prone
-
 local actionDefinitions = {
     { label = "Copy", handler = function(targetName) CopyAllTheNames.openCopyPopup(targetName) end },
     { label = "Whisper", handler = function(targetName)
@@ -212,7 +198,6 @@ local actionDefinitions = {
 }
 
 -- Create a new reusable list row containing a name and interaction buttons to display entries because the dialog needs to handle variable lengths
-
 local function createPlayerRow(scrollChildFrame, rowIndex)
     local playerRow = CreateFrame("Frame", nil, scrollChildFrame)
 
@@ -251,7 +236,6 @@ local function createPlayerRow(scrollChildFrame, rowIndex)
 end
 
 -- Populate the scroll list with collected names reusing frame object references to render the interface efficiently because making frames each time hurts performance
-
 local function updateNamesDialog(playerNamesList)
     if not namesDialog then return end
 
@@ -282,7 +266,6 @@ local function updateNamesDialog(playerNamesList)
 end
 
 -- Initialize and display the main interface containing collected names to provide bulk actions because viewing multiple scraped names requires a dedicated window
-
 local function showNamesDialog(playerNamesList)
     if not namesDialog then
         local mainDialog = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
@@ -338,7 +321,6 @@ local function showNamesDialog(playerNamesList)
 end
 
 -- Expose UI generation routines and main dialog references publicly to allow other files to attach scraping hooks because logic is divided into feature modules
-
 CopyAllTheNames.applyClassicButtonStyle = applyClassicButtonStyle
 CopyAllTheNames.createActionButton = createActionButton
 
