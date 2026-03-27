@@ -1,6 +1,6 @@
 -- Initialize global namespace for the addon to share functions between modules because the addon uses multiple separate Lua files
 
-CopyAllTheNames = CopyAllTheNames or {}
+SuperContact = SuperContact or {}
 
 -- Declare local variables for UI components and row pooling to manage state because frames should be reused avoiding memory leaks
 local namesDialog
@@ -85,7 +85,7 @@ local rowButtonWidth = (function()
 end)()
 
 -- Open a text input dialog framing the provided string to facilitate copying because the user cannot highlight standard font strings
-function CopyAllTheNames.openCopyPopup(playerName)
+function SuperContact.openCopyPopup(playerName)
     if not copyPopup then
         copyPopup = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
         copyPopup:SetSize(300, 110)
@@ -149,14 +149,14 @@ end
 
 -- Warn the user to wait until the match ends to prevent taint errors because Blizzard restricts name access during active PvP
 local function printMatchActiveWarning()
-    print("|cffff9900CopyAllTheNames:|r Match is still active. Wait until it ends to whisper players.")
+    print("|cffff9900SuperContact:|r Match is still active. Wait until it ends to whisper players.")
 end
 
 -- Define slash command to whisper all collected names to support bulk communication because manually whispering list members is slow
-SLASH_COPYALLTHENAMES_WHISPERALL1 = "/whisperall"
-SlashCmdList["COPYALLTHENAMES_WHISPERALL"] = function(chatMessage)
+SLASH_SUPERCONTACT_WHISPERALL1 = "/whisperall"
+SlashCmdList["SUPERCONTACT_WHISPERALL"] = function(chatMessage)
     if not chatMessage or chatMessage == "" then
-        print("|cffff9900CopyAllTheNames:|r Usage: /whisperall <message>")
+        print("|cffff9900SuperContact:|r Usage: /whisperall <message>")
         return
     end
 
@@ -166,7 +166,7 @@ SlashCmdList["COPYALLTHENAMES_WHISPERALL"] = function(chatMessage)
     end
 
     if #currentNames == 0 then
-        print("|cffff9900CopyAllTheNames:|r No players in the current list.")
+        print("|cffff9900SuperContact:|r No players in the current list.")
         return
     end
 
@@ -180,7 +180,7 @@ end
 
 -- Store generic handlers for list interaction buttons to populate row actions dynamically because duplicating button configuration code is error prone
 local actionDefinitions = {
-    { label = "Copy", handler = function(targetName) CopyAllTheNames.openCopyPopup(targetName) end },
+    { label = "Copy", handler = function(targetName) SuperContact.openCopyPopup(targetName) end },
     { label = "Whisper", handler = function(targetName)
         if isMatchStillActive() then
             printMatchActiveWarning()
@@ -321,10 +321,10 @@ local function showNamesDialog(playerNamesList)
 end
 
 -- Expose UI generation routines and main dialog references publicly to allow other files to attach scraping hooks because logic is divided into feature modules
-CopyAllTheNames.applyClassicButtonStyle = applyClassicButtonStyle
-CopyAllTheNames.createActionButton = createActionButton
+SuperContact.applyClassicButtonStyle = applyClassicButtonStyle
+SuperContact.createActionButton = createActionButton
 
-CopyAllTheNames_NamesDialog = {
+SuperContact_NamesDialog = {
     Show = showNamesDialog,
     Hide = function() if namesDialog then namesDialog:Hide() end end,
     Update = updateNamesDialog,

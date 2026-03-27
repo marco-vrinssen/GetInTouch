@@ -32,14 +32,14 @@ local sellerNamesButton
 local function setupAuctionHouse()
     if not AuctionHouseFrame or sellerNamesButton then return end
 
-    local playerNamesButton = CopyAllTheNames.createActionButton(AuctionHouseFrame, "Contact Players", 120, function()
+    local playerNamesButton = SuperContact.createActionButton(AuctionHouseFrame, "Contact Players", 120, function()
         if InCombatLockdown() then return end
 
-        CopyAllTheNames_NamesDialog.Hide()
+        SuperContact_NamesDialog.Hide()
         local playerNamesList = collectSellerNames()
 
         if #playerNamesList > 0 then
-            CopyAllTheNames_NamesDialog.Show(playerNamesList)
+            SuperContact_NamesDialog.Show(playerNamesList)
         end
     end, 25)
 

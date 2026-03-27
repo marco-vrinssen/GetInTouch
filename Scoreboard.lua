@@ -28,12 +28,12 @@ end
 
 -- Fetch the latest match metrics from the api to refresh the open name frame
 local function refreshPlayerList()
-    if not CopyAllTheNames_NamesDialog.IsShown() then return end
+    if not SuperContact_NamesDialog.IsShown() then return end
 
     local playerNamesList = collectPlayerNames()
 
     if #playerNamesList > 0 then
-        CopyAllTheNames_NamesDialog.Update(playerNamesList)
+        SuperContact_NamesDialog.Update(playerNamesList)
     end
 end
 
@@ -42,7 +42,7 @@ local function showWhenDataReady()
     local playerNamesList = collectPlayerNames()
 
     if #playerNamesList > 0 then
-        CopyAllTheNames_NamesDialog.Show(playerNamesList)
+        SuperContact_NamesDialog.Show(playerNamesList)
         return
     end
 
@@ -55,7 +55,7 @@ local function showWhenDataReady()
         isPendingShow = false
         local names = collectPlayerNames()
         if #names > 0 then
-            CopyAllTheNames_NamesDialog.Show(names)
+            SuperContact_NamesDialog.Show(names)
         end
     end)
 end
@@ -64,9 +64,9 @@ end
 local function createNamesButton()
     if not PVPMatchResults or PVPMatchResults.namesButtonTrigger then return end
 
-    local interactionButton = CopyAllTheNames.createActionButton(PVPMatchResults, "Contact Players", 120, function()
-        if CopyAllTheNames_NamesDialog.IsShown() then
-            CopyAllTheNames_NamesDialog.Hide()
+    local interactionButton = SuperContact.createActionButton(PVPMatchResults, "Contact Players", 120, function()
+        if SuperContact_NamesDialog.IsShown() then
+            SuperContact_NamesDialog.Hide()
             return
         end
         showWhenDataReady()
@@ -94,7 +94,7 @@ eventListenerFrame:SetScript("OnEvent", function(_, dispatchedEvent, matchedAddo
             isPendingShow = false
             local names = collectPlayerNames()
             if #names > 0 then
-                CopyAllTheNames_NamesDialog.Show(names)
+                SuperContact_NamesDialog.Show(names)
             end
         else
             refreshPlayerList()

@@ -142,7 +142,7 @@ local function addCopyButton(menuOwnerTarget, menuRootComponent, contextData)
 
     menuRootComponent:CreateButton("Copy Full Name", function()
         if not InCombatLockdown() then
-            CopyAllTheNames.openCopyPopup(extractedName .. "-" .. extractedRealm)
+            SuperContact.openCopyPopup(extractedName .. "-" .. extractedRealm)
         end
     end)
 end

@@ -1,12 +1,11 @@
 ## Interface: 120000
-## Title: CopyAllTheNames
+## Title: Super Contact
 ## Notes: Copy player names from context menus, PvP scoreboard, auction house sellers, and mouseover text
 ## Author: MIYANKO
 ## Version: 1.0.0
 ## IconTexture: 3163627
 
-CopyString.lua
 PopupList.lua
-PvPNames.lua
-SellerNames.lua
-UnitNames.lua
+Scoreboard.lua
+Auction.lua
+Units.lua
