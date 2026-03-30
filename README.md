@@ -1,4 +1,4 @@
-# Super Contact
+# Get In Touch
 
 WoW addon to copy player names from right-click context menus, PvP scoreboards, and auction house seller lists, with bulk whisper and invite support.
 
