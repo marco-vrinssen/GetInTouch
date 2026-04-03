@@ -1,11 +1,11 @@
 ## Interface: 120000
 ## Title: Get In Touch
-## Notes: Copy player names from context menus, PvP scoreboard, auction house sellers, and mouseover text
+## Notes: Copy player names from context menus, PvP scoreboard, and auction house sellers
 ## Author: MIYANKO
 ## Version: 1.0.0
 ## IconTexture: 134149
 
 PopupList.lua
 Scoreboard.lua
-Auction.lua
-Units.lua
+Sellers.lua
+UnitFrames.lua
