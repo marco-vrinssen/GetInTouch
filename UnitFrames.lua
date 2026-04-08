@@ -195,6 +195,6 @@ local evtFrame = CreateFrame("Frame")
 evtFrame:RegisterEvent("ADDON_LOADED")
 evtFrame:SetScript("OnEvent", function(_, _, addon)
     if addon == "Blizzard_PVPUI" then
-        registerHooks()
+        C_Timer.After(0, registerHooks)
     end
 end)
