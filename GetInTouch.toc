@@ -1,4 +1,4 @@
-## Interface: 120000
+## Interface: 120005
 ## Title: Get In Touch
 ## Notes: Copy player names from context menus, PvP scoreboard, and auction house sellers
 ## Author: MIYANKO
