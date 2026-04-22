@@ -1,6 +1,6 @@
 ## Interface: 120005
 ## Title: Get In Touch
-## Notes: Copy player names from context menus, PvP scoreboard, and auction house sellers
+## Notes: Easily copy player names and interact with others in World of Warcraft.
 ## Author: MIYANKO
 ## Version: 1.0.0
 ## IconTexture: 134149
