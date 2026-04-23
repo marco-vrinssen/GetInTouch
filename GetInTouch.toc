@@ -1,7 +1,7 @@
 ## Interface: 120005
 ## Title: Get In Touch
 ## Category: Social
-## Notes: Easily copy player names and interact with others in World of Warcraft.
+## Notes: Adds copy-name and bulk-whisper actions to unit menus, PvP scoreboards, and auction house listings. Removes manual typing when reaching out to other players.
 ## Author: MIYANKO
 ## Version: 1.0.0
 ## IconTexture: 134149
